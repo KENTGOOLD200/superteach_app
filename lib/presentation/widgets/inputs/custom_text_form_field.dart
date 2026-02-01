@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 
 // ============================================================================
-// WIDGET REUTILIZABLE: INPUT DE TEXTO (VIVID NEON STYLE)
+// WIDGET REUTILIZABLE: INPUT DE TEXTO (VIVID NEON & VALIDATION)
 // ============================================================================
 // PROPÓSITO:
-// Caja de texto con estilo "Cristal Oscuro" y bordes de neón.
-// Se adapta automáticamente a los colores vibrantes del tema (Cian/Magenta).
+// Caja de texto con estilo "Cristal Oscuro".
+// - Soporta validaciones visuales: Se pone ROJO si hay error.
+// - Se adapta a los colores vibrantes del tema (Cian/Magenta).
 // ============================================================================
 
 class CustomTextFormField extends StatelessWidget {
   
+  // Parámetros de configuración
   final String? label;
   final String? hint;
   final String? errorMessage;
   final bool obscureText;
   final TextInputType? keyboardType;
   final Function(String)? onChanged;
-  final String? Function(String?)? validator;
+  final String? Function(String?)? validator; // Función que decide si el texto es válido
   final IconData? prefixIcon;
 
   const CustomTextFormField({
@@ -33,47 +35,58 @@ class CustomTextFormField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos los colores vibrantes del tema (Primary = Neon Cyan)
+    // Obtenemos los colores del tema actual
     final colors = Theme.of(context).colorScheme;
 
     return Container(
-      // Decoración: Caja de Cristal Oscura
+      // Decoración del contenedor (Fondo oscuro y sombra)
       decoration: BoxDecoration(
-        // AJUSTE: Usamos un color de fondo más oscuro para resaltar el neón
-        color: const Color(0xFF121826), 
+        color: const Color(0xFF121826), // Fondo oscuro para resaltar el neón
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
-          // AJUSTE: Aumentamos la opacidad de la sombra para más "Glow"
           BoxShadow(
-            color: colors.primary.withOpacity(0.15), // Sombra Cian Vibrante
+            color: colors.primary.withOpacity(0.15), // Glow suave
             blurRadius: 12,
             offset: const Offset(0, 4),
           )
         ],
-        // Borde sutil brillante
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
       child: TextFormField(
+        // Conectamos las propiedades lógicas
         onChanged: onChanged,
-        validator: validator,
+        validator: validator, // Clave para que funcione la validación del Form
         obscureText: obscureText,
         keyboardType: keyboardType,
         style: const TextStyle(fontSize: 18, color: Colors.white),
         
+        // Configuración visual interna
         decoration: InputDecoration(
           prefixIcon: prefixIcon != null 
-            ? Icon(prefixIcon, color: colors.primary) // Icono en Cian Eléctrico
+            ? Icon(prefixIcon, color: colors.primary)
             : null,
           label: label != null ? Text(label!) : null,
-          labelStyle: TextStyle(color: colors.primary.withOpacity(0.6)), // Etiqueta coloreada
+          labelStyle: TextStyle(color: colors.primary.withOpacity(0.6)),
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.white24),
-          errorText: errorMessage,
           
-          // Quitamos los bordes por defecto (ya decoramos el Container)
+          // ESTADO NORMAL: Sin bordes visibles (el Container da el color)
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
+          
+          // ESTADO DE ERROR: Borde ROJO cuando la validación falla
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+          ),
+          // ESTADO DE ERROR + FOCO: Borde ROJO brillante mientras corriges
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(15),
+            borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+          ),
+          
+          // Estilo del texto de error pequeño debajo del input
+          errorStyle: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+          
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
       ),
