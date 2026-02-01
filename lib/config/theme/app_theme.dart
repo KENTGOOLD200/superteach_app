@@ -27,8 +27,7 @@ class AppTheme {
       // Definimos el esquema de colores base usando el Cian como principal
       colorScheme: ColorScheme.dark(
         primary: neonCyan,           // Color principal de la app
-        secondary: neonMagenta,      // Color secundario/acento
-        background: darkBackground,  // Color de fondo
+        secondary: neonMagenta,  // Color de fondo
         surface: const Color(0xFF121826), // Color de las "tarjetas" o inputs
       ),
       
