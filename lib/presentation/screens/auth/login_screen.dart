@@ -189,7 +189,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
                 ),
                 Switch(
                   value: isTeacher,
-                  activeColor: Colors.white,
+                  activeThumbColor: Colors.white,
                   activeTrackColor: neonMagenta,
                   inactiveThumbColor: Colors.white,
                   inactiveTrackColor: neonCyan,
