@@ -1,18 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
+import 'package:go_router/go_router.dart'; // 👈 IMPORTANTE: Necesario para navegar
 import 'package:superteach_app/config/theme/app_theme.dart';
 import 'package:superteach_app/presentation/providers/auth_provider.dart';
 import 'package:superteach_app/presentation/widgets/inputs/custom_text_form_field.dart';
 
 // ============================================================================
-// PANTALLA DE LOGIN (SMART VALIDATION & UX)
-// ============================================================================
-// PROPÓSITO:
-// 1. Maneja la entrada de datos del usuario.
-// 2. Aplica limpieza de datos (.trim) para evitar errores por espacios.
-// 3. Gestiona la retroalimentación visual (Carga, Errores, Éxito).
-// 4. Usa un 'Form' global para validar campos vacíos antes de enviar.
+// PANTALLA DE LOGIN (CON ACCESO A REGISTRO)
 // ============================================================================
 
 class LoginScreen extends ConsumerWidget {
@@ -21,54 +16,20 @@ class LoginScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     
-    // 1. ESCUCHA DE ESTADO (LISTENER)
-    // Reacciona a cambios: Error -> Muestra SnackBar Rojo / Éxito -> Muestra SnackBar Cian
-    ref.listen(authProvider, (previous, next) {
-      if (next.errorMessage.isNotEmpty) {
-        // UX: Limpiamos mensajes anteriores para que no se acumulen
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.errorMessage, style: const TextStyle(color: Colors.white)),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating, // Flotante se ve más moderno
-          ),
-        );
-      }
-
-      if (next.status == AuthStatus.authenticated) {
-        // UX: Limpiamos cualquier error previo
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡ACCESO CONCEDIDO! Bienvenido', style: TextStyle(color: Colors.black)),
-            backgroundColor: neonCyan,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    });
-
-    // Leemos el estado para saber si debemos mostrar el círculo de carga
     final authState = ref.watch(authProvider);
 
     return Scaffold(
       body: Stack(
         children: [
-          // Capa del Formulario (SafeArea para respetar el notch)
           const SafeArea(
             child: SingleChildScrollView(
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-                child: _LoginForm(),
+                child: _LoginForm(), 
               ),
             ),
           ),
 
-          // Capa de Bloqueo (Loading Overlay)
-          // Se muestra solo si estamos verificando credenciales
           if (authState.status == AuthStatus.checking)
             Container(
               color: Colors.black.withOpacity(0.8),
@@ -82,7 +43,6 @@ class LoginScreen extends ConsumerWidget {
   }
 }
 
-// Sub-widget con estado para manejar los controladores de texto y el Form
 class _LoginForm extends ConsumerStatefulWidget {
   const _LoginForm();
   @override
@@ -90,7 +50,6 @@ class _LoginForm extends ConsumerStatefulWidget {
 }
 
 class _LoginFormState extends ConsumerState<_LoginForm> {
-  // LLAVE DEL FORMULARIO: Nos permite saber si todos los inputs son válidos
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   
   bool isTeacher = false;
@@ -99,7 +58,6 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
 
   @override
   void dispose() {
-    // Buena práctica: Limpiar controladores al salir de la pantalla
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
@@ -110,7 +68,40 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
     final textStyles = Theme.of(context).textTheme;
     final authNotifier = ref.read(authProvider.notifier);
 
-    // Envolvemos todo en 'Form' para habilitar la validación automática
+    // ========================================================================
+    // ESCUCHADOR DE EVENTOS (LISTENER)
+    // ========================================================================
+    ref.listen(authProvider, (previous, next) {
+      
+      // CASO DE ERROR
+      if (next.errorMessage.isNotEmpty) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.errorMessage, style: const TextStyle(color: Colors.white)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
+        // Limpieza visual de contraseña
+        passwordController.clear(); 
+      }
+
+      // CASO DE ÉXITO
+      if (next.status == AuthStatus.authenticated) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡ACCESO CONCEDIDO! Bienvenido', style: TextStyle(color: Colors.black)),
+            backgroundColor: neonCyan,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+
     return Form(
       key: _formKey,
       child: Column(
@@ -118,7 +109,6 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
         children: [
           const Gap(40),
           
-          // --- LOGO ---
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -143,8 +133,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
             hint: 'usuario@superteach.com',
             keyboardType: TextInputType.emailAddress,
             prefixIcon: Icons.email_outlined,
-            onChanged: (value) => emailController.text = value,
-            // VALIDACIÓN: Si retorna un String, es error. Si es null, es válido.
+            controller: emailController, 
             validator: (value) {
               if (value == null || value.trim().isEmpty) return 'El email es obligatorio';
               return null;
@@ -152,23 +141,22 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
           ),
           const Gap(20),
           
-          // --- INPUT PASSWORD ---
+          // --- INPUT CONTRASEÑA ---
           CustomTextFormField(
-            label: 'Clave de Acceso',
-            hint: '******',
+            label: 'Contraseña',
+            hint: '********',
             obscureText: true,
             prefixIcon: Icons.lock_outline,
-            onChanged: (value) => passwordController.text = value,
-            // VALIDACIÓN DE CAMPO VACÍO
+            controller: passwordController, 
             validator: (value) {
-              if (value == null || value.trim().isEmpty) return 'Ingresa tu clave';
+              if (value == null || value.trim().isEmpty) return 'Ingresa tu contraseña';
               return null;
             },
           ),
           
           const Gap(30),
 
-          // --- SWITCH DE ROL (VIBRANTE) ---
+          // --- SWITCH DE ROL ---
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -201,24 +189,18 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
 
           const Gap(40),
 
-          // --- BOTÓN DE INICIO ---
+          // --- BOTÓN INICIAR ---
           SizedBox(
             width: double.infinity,
             height: 55,
             child: FilledButton(
               onPressed: () {
-                // 1. VALIDACIÓN VISUAL:
-                // Verifica si los campos cumplen las reglas del 'validator'.
-                // Si falla, pone los bordes rojos automáticamente y detiene la función.
-                if (_formKey.currentState?.validate() != true) {
-                  return; 
-                }
+                if (_formKey.currentState?.validate() != true) return;
 
-                // 2. LLAMADA AL BACKEND:
-                // Usamos .trim() para limpiar espacios accidentales antes y después del texto.
                 authNotifier.loginUser(
                   emailController.text.trim(), 
-                  passwordController.text.trim()
+                  passwordController.text.trim(),
+                  isTeacher 
                 );
               },
               style: FilledButton.styleFrom(
@@ -232,6 +214,28 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
             ),
           ),
           const Gap(20),
+
+          // --- NUEVO: ENLACE A REGISTRO ---
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('¿No tienes cuenta?', style: TextStyle(color: Colors.white54)),
+              TextButton(
+                // Navegación segura usando GoRouter
+                onPressed: () => context.push('/register'), 
+                child: const Text(
+                  'Regístrate aquí', 
+                  style: TextStyle(
+                    color: neonCyan, 
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                    decorationColor: neonCyan,
+                  )
+                ),
+              )
+            ],
+          ),
+          const Gap(30), // Espacio extra al final para scrolling
         ],
       ),
     );

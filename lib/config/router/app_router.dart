@@ -1,36 +1,47 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+// IMPORTACIÓN DE PANTALLAS (Views)
+import 'package:superteach_app/presentation/screens/onboarding/onboarding_screen.dart';
 import 'package:superteach_app/presentation/screens/auth/login_screen.dart';
+import 'package:superteach_app/presentation/screens/auth/register_screen.dart';
 
 // ============================================================================
 // CONFIGURACIÓN: ROUTER (SISTEMA DE NAVEGACIÓN)
 // ============================================================================
 // PROPÓSITO:
-// Define el "mapa" de la aplicación.
-// Configura qué pantalla se debe mostrar según la dirección (URL) actual.
-// Utiliza 'GoRouter' para manejo profesional de historial y navegación web/móvil.
+// Define el "mapa" de la aplicación usando GoRouter.
+// Gestiona la navegación entre Onboarding, Login y Registro.
 // ============================================================================
 
-// Creamos un Provider de lectura para que el router pueda ser accedido globalmente
 final appRouterProvider = Provider<GoRouter>((ref) {
   
   return GoRouter(
-    // URL inicial al abrir la app.
-    // En el futuro, aquí validaremos si hay token para ir directo al Home.
-    initialLocation: '/login', 
+    // PANTALLA INICIAL:
+    // Arrancamos en el Onboarding (Semana 8)
+    initialLocation: '/onboarding', 
 
-    // Lista de todas las rutas posibles en la app
     routes: [
       
-      // RUTA: LOGIN
+      // 1. RUTA: ONBOARDING (Bienvenida)
       GoRoute(
-        path: '/login', // La dirección interna
-        builder: (context, state) => const LoginScreen(), // La pantalla visual
+        path: '/onboarding',
+        builder: (context, state) => const OnboardingScreen(),
       ),
 
-      // TODO: Aquí agregaremos más adelante:
-      // - '/register': Pantalla de registro
-      // - '/home': Pantalla principal (Dashboard)
+      // 2. RUTA: LOGIN (Inicio de Sesión)
+      GoRoute(
+        path: '/login',
+        builder: (context, state) => const LoginScreen(),
+      ),
+
+      // 3. RUTA: REGISTRO (Crear Cuenta - Semana 8)
+      // Esta es la ruta que da error si no existe la clase 'RegisterScreen'
+      GoRoute(
+        path: '/register',
+        builder: (context, state) => const RegisterScreen(),
+      ),
+
     ],
   );
 });

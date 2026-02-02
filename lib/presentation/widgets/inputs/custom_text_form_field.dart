@@ -1,91 +1,104 @@
 import 'package:flutter/material.dart';
 
 // ============================================================================
-// WIDGET REUTILIZABLE: INPUT DE TEXTO (VIVID NEON & VALIDATION)
+// WIDGET: INPUT DE TEXTO PERSONALIZADO (CON ESTADO DE ERROR VISUAL)
 // ============================================================================
 // PROPÓSITO:
-// Caja de texto con estilo "Cristal Oscuro".
-// - Soporta validaciones visuales: Se pone ROJO si hay error.
-// - Se adapta a los colores vibrantes del tema (Cian/Magenta).
+// Un campo de texto reutilizable que maneja estilos oscuros/neón.
+// CORRECCIÓN APLICADA: Ahora conecta 'errorMessage' directamente con la UI
+// para pintar los bordes de rojo cuando la validación falla.
 // ============================================================================
 
 class CustomTextFormField extends StatelessWidget {
   
-  // Parámetros de configuración
   final String? label;
   final String? hint;
-  final String? errorMessage;
+  final String? errorMessage; // 👈 Mensaje de error que viene del Provider
   final bool obscureText;
   final TextInputType? keyboardType;
   final Function(String)? onChanged;
-  final String? Function(String?)? validator; // Función que decide si el texto es válido
+  final String? Function(String?)? validator;
   final IconData? prefixIcon;
+  final TextEditingController? controller;
 
   const CustomTextFormField({
     super.key,
     this.label,
     this.hint,
-    this.errorMessage,
+    this.errorMessage, // Si esto no es null, el campo se pone rojo
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
     this.onChanged,
     this.validator,
     this.prefixIcon,
+    this.controller,
   });
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos los colores del tema actual
     final colors = Theme.of(context).colorScheme;
 
+    // Borde normal (cuando no hay error)
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(15),
+      borderSide: const BorderSide(color: Colors.transparent), 
+    );
+
+    // Borde de ERROR (Rojo y más grueso)
+    final errorBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(15),
+      borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+    );
+
     return Container(
-      // Decoración del contenedor (Fondo oscuro y sombra)
       decoration: BoxDecoration(
-        color: const Color(0xFF121826), // Fondo oscuro para resaltar el neón
+        color: const Color(0xFF121826),
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: colors.primary.withOpacity(0.15), // Glow suave
+            color: colors.primary.withOpacity(0.15),
             blurRadius: 12,
             offset: const Offset(0, 4),
           )
         ],
       ),
       child: TextFormField(
-        // Conectamos las propiedades lógicas
+        controller: controller,
         onChanged: onChanged,
-        validator: validator, // Clave para que funcione la validación del Form
+        validator: validator,
         obscureText: obscureText,
         keyboardType: keyboardType,
         style: const TextStyle(fontSize: 18, color: Colors.white),
         
-        // Configuración visual interna
         decoration: InputDecoration(
+          // Icono: Si hay error es rojo, si no es del color primario
           prefixIcon: prefixIcon != null 
-            ? Icon(prefixIcon, color: colors.primary)
+            ? Icon(prefixIcon, color: errorMessage != null ? Colors.redAccent : colors.primary)
             : null,
+          
           label: label != null ? Text(label!) : null,
-          labelStyle: TextStyle(color: colors.primary.withOpacity(0.6)),
+          // Texto del Label: Rojo si hay error
+          labelStyle: TextStyle(
+            color: errorMessage != null ? Colors.redAccent : colors.primary.withOpacity(0.6)
+          ),
+          
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.white24),
           
-          // ESTADO NORMAL: Sin bordes visibles (el Container da el color)
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          
-          // ESTADO DE ERROR: Borde ROJO cuando la validación falla
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: const BorderSide(color: Colors.redAccent, width: 2),
-          ),
-          // ESTADO DE ERROR + FOCO: Borde ROJO brillante mientras corriges
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(15),
-            borderSide: const BorderSide(color: Colors.redAccent, width: 2),
-          ),
-          
-          // Estilo del texto de error pequeño debajo del input
+          // ⚠️ AQUÍ ESTÁ LA CORRECCIÓN VISUAL:
+          // Le decimos explícitamente al input que muestre el texto de error.
+          // Al asignar esto, Flutter automáticamente usa los 'errorBorder' definidos abajo.
+          errorText: errorMessage, 
           errorStyle: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+          
+          // Estados de los bordes
+          border: border,
+          enabledBorder: border,
+          focusedBorder: border,
+          
+          // Bordes cuando hay error (Rojo)
+          errorBorder: errorBorder,
+          focusedErrorBorder: errorBorder,
           
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
