@@ -36,15 +36,18 @@ class RegisterScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () => context.go('/login'),
         ),
+        centerTitle: true,
+        title: Text('Crear Cuenta', style: textStyles.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('Crear Cuenta', style: textStyles.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
-              Text('Completa todos los campos obligatorios (*)', style: textStyles.bodySmall?.copyWith(color: neonCyan)),
+              Center(
+                child: Text('Completa todos los campos obligatorios (*)', style: textStyles.bodySmall?.copyWith(color: neonCyan)),
+              ),
               const Gap(30),
 
               // ==============================================================
@@ -192,7 +195,7 @@ class RegisterScreen extends ConsumerWidget {
                           title: const Text('¿Tienes un Código de Clase?', style: TextStyle(color: Colors.white)),
                           subtitle: const Text('Activa si te vas a unir a una clase', style: TextStyle(color: Colors.white54, fontSize: 12)),
                           value: registerState.hasClassCode,
-                          activeColor: neonCyan,
+                          activeThumbColor: neonCyan,
                           contentPadding: EdgeInsets.zero,
                           onChanged: registerNotifier.onStudentTypeChanged,
                         ),
@@ -286,7 +289,7 @@ class _RoleSelector extends StatelessWidget {
           Text(isTeacher ? 'SOY PROFESOR' : 'SOY ESTUDIANTE', style: TextStyle(color: isTeacher ? neonMagenta : neonCyan, fontWeight: FontWeight.bold)),
           Switch(
             value: isTeacher,
-            activeColor: Colors.white,
+            activeThumbColor: Colors.white,
             activeTrackColor: neonMagenta,
             inactiveTrackColor: neonCyan,
             inactiveThumbColor: Colors.white,
