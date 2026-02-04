@@ -1,32 +1,27 @@
 // ============================================================================
-// HELPER: VALIDADORES CENTRALIZADOS (APP VALIDATORS)
-// ============================================================================
-// PROPÓSITO:
-// Contiene la lógica pura de validación (Regex) para mantener la UI limpia.
-// Incluye reglas estrictas para contraseñas, emails, teléfonos y URLs.
+// ARCHIVO: APP_VALIDATORS.DART
+// DESCRIPCIÓN: REGLAS DE VALIDACIÓN (REGEX) CENTRALIZADAS
 // ============================================================================
 
 class AppValidators {
   
-  // Regex para Email (Estándar W3C)
+  // Regex para Email
   static final RegExp _emailRegex = RegExp(
     r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+"
   );
 
-  // Regex para Contraseña Estricta:
-  // - Al menos 1 minúscula, 1 mayúscula, 1 número, 1 carácter especial
-  // - Mínimo 8 caracteres
+  // Regex Contraseña Estricta
   static final RegExp _passwordStrictRegex = RegExp(
     r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$'
   );
 
-  // Regex para detectar si es una URL de imagen válida (termina en extensión gráfica)
-  static final RegExp _imageRegex = RegExp(
-    r"(https?:\/\/.*\.(?:png|jpg|jpeg|webp|gif))", 
-    caseSensitive: false
+  // ⚠️ NUEVO: Regex para NOMBRE (Solo letras, espacios y tildes/ñ)
+  // No permite números ni símbolos.
+  static final RegExp _nameRegex = RegExp(
+    r"^[a-zA-ZñÑáéíóúÁÉÍÓÚ\s]+$"
   );
 
-  // --- MÉTODOS DE VALIDACIÓN ---
+  // --- MÉTODOS ---
 
   static String? email(String? value) {
     if (value == null || value.trim().isEmpty) return 'El correo es obligatorio';
@@ -38,41 +33,50 @@ class AppValidators {
     if (value == null || value.trim().isEmpty) return 'La contraseña es obligatoria';
     if (value.length < 8) return 'Mínimo 8 caracteres';
     if (!_passwordStrictRegex.hasMatch(value)) {
-      return 'Debe tener: Mayúscula, Minúscula, Número y Símbolo (@#%)';
+      return 'Debe tener: Mayúscula, Minúscula, Número y Símbolo';
     }
     return null;
   }
 
+  // VALIDACIÓN ACTUALIZADA: NOMBRE
   static String? name(String? value) {
     if (value == null || value.trim().isEmpty) return 'El nombre es obligatorio';
     if (value.trim().length < 3) return 'El nombre es muy corto';
+    
+    // Aplicamos la restricción de solo letras
+    if (!_nameRegex.hasMatch(value.trim())) {
+      return 'Solo se permiten letras (no números ni símbolos)';
+    }
+    return null;
+  }
+
+  // ⚠️ NUEVO VALIDADOR: USUARIO
+  static String? username(String? value) {
+    if (value == null || value.trim().isEmpty) return 'El usuario es obligatorio';
+    if (value.trim().length < 3) return 'Mínimo 3 caracteres';
+    // Opcional: Podrías agregar regex para que el usuario no tenga espacios, etc.
     return null;
   }
 
   static String? phone(String? value) {
     if (value == null || value.trim().isEmpty) return 'El teléfono es obligatorio';
     final cleanPhone = value.trim().replaceAll(' ', '');
-    
-    // Validar que sean solo números
     if (int.tryParse(cleanPhone) == null) return 'Solo se permiten números';
-    
-    // Validación de longitud (Entre 7 y 10 dígitos)
     if (cleanPhone.length > 10) return 'Máximo 10 dígitos';
     if (cleanPhone.length < 7) return 'Número inválido';
     return null;
   }
 
+  // URL Foto (Opcional)
+  static final RegExp _imageRegex = RegExp(r"(https?:\/\/.*\.(?:png|jpg|jpeg|webp|gif))", caseSensitive: false);
   static String? photoUrl(String? value) {
-    if (value == null || value.trim().isEmpty) return null; // Es opcional
-    if (!_imageRegex.hasMatch(value.trim())) {
-      return 'El enlace debe terminar en .jpg, .png o .webp';
-    }
+    if (value == null || value.trim().isEmpty) return null;
+    if (!_imageRegex.hasMatch(value.trim())) return 'Debe ser URL de imagen (.jpg, .png)';
     return null;
   }
 
-  // Validación para el código de clase (tanto para crear como para unirse)
   static String? classCode(String? value) {
-    if (value == null || value.trim().isEmpty) return 'El código de clase es obligatorio';
+    if (value == null || value.trim().isEmpty) return 'El código es obligatorio';
     if (value.trim().length < 4) return 'Mínimo 4 caracteres';
     return null;
   }

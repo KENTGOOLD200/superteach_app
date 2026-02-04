@@ -2,35 +2,28 @@ import 'package:superteach_app/domain/entities/user.dart';
 import 'package:superteach_app/domain/errors/auth_errors.dart';
 
 // ============================================================================
-// INFRAESTRUCTURA: DATASOURCE SIMULADO (MOCK DB)
-// ============================================================================
-// PROPÓSITO:
-// Simula el comportamiento de un Backend real.
-// Almacena usuarios en memoria y gestiona la validación de unicidad de datos.
+// INFRAESTRUCTURA: DATASOURCE SIMULADO (PERSISTENTE EN MEMORIA)
 // ============================================================================
 
 class MockAuthDataSource {
   
-  // Base de datos de usuarios (Simulación en memoria RAM)
-  // Nota: 'profe@test.com' ya existe, úsalo para probar el error de duplicado.
-  final List<Map<String, dynamic>> _mockDatabase = [
+  // Base de datos persistente (Static)
+  static final List<Map<String, dynamic>> _mockDatabase = [
     {
       'email': 'profe@test.com',
       'password': '123',
       'name': 'Profesor Xavier',
-      'role': 'teacher'
+      'username': 'ProfeX', // ⚠️ Nuevo campo usuario
+      'role': 'teacher',
+      'phone': '0999999999',
     },
   ];
 
-  // Base de datos de Códigos de Clase Activos
-  // Estos códigos YA EXISTEN.
-  // - Un Profesor NO puede crear uno igual (Error: Ya existe).
-  // - Un Alumno DEBE usar uno de estos (Error: No existe).
-  final List<String> _activeClassCodes = ['MAT-101', 'HIST-202', 'CIEN-303'];
+  static final List<String> _activeClassCodes = ['MAT-101', 'HIST-202'];
 
-  // --- LOGIN (INICIO DE SESIÓN) ---
+  // --- LOGIN ---
   Future<User> login(String email, String password) async {
-    await Future.delayed(const Duration(seconds: 1)); // Simula latencia de red
+    await Future.delayed(const Duration(seconds: 1)); 
     try {
       final user = _mockDatabase.firstWhere(
         (u) => u['email'] == email,
@@ -42,48 +35,58 @@ class MockAuthDataSource {
         id: '1',
         email: user['email'],
         fullName: user['name'],
+        // Podrías mapear el username a la entidad User si lo necesitas
         role: user['role'] == 'teacher' ? UserRole.teacher : UserRole.student,
-        token: 'token-simulado',
+        token: 'token-simulado-${user['email']}',
       );
     } catch (e) {
       if (e is WrongCredentials) throw WrongCredentials();
-      throw CustomError('Error en el servidor');
+      throw CustomError('Error en el servidor o credenciales inválidas');
     }
   }
 
-  // --- VALIDACIONES ASÍNCRONAS (CONSULTAS AL BACKEND) ---
+  // --- VALIDACIONES ---
 
-  // 1. Validar si el Email ya existe en la BD
   Future<bool> checkEmailExists(String email) async {
     await Future.delayed(const Duration(milliseconds: 600));
     return _mockDatabase.any((u) => u['email'] == email);
   }
 
-  // 2. Validar si el Código de Clase existe
+  // ⚠️ NUEVA VALIDACIÓN: USUARIO DUPLICADO
+  Future<bool> checkUsernameExists(String username) async {
+    await Future.delayed(const Duration(milliseconds: 600));
+    // Compara ignorando mayúsculas/minúsculas
+    return _mockDatabase.any((u) => u['username'].toString().toLowerCase() == username.toLowerCase());
+  }
+
   Future<bool> checkClassCodeExists(String code) async {
     await Future.delayed(const Duration(milliseconds: 600));
     return _activeClassCodes.contains(code.toUpperCase()); 
   }
 
-  // --- REGISTRO (GUARDAR NUEVO USUARIO) ---
+  // --- REGISTRO (CON USUARIO) ---
   Future<void> register({
     required String email, 
     required String password, 
     required String name, 
+    required String username, // ⚠️ Requerido
     required String role,
     required String phone,
-    String? photoUrl,
     String? createdClassCode,
   }) async {
-    await Future.delayed(const Duration(seconds: 2)); // Simula tiempo de guardado
+    await Future.delayed(const Duration(seconds: 2));
 
-    // 1. VERIFICACIÓN DE SEGURIDAD: CORREO DUPLICADO
+    // 1. Validación Email
     if (_mockDatabase.any((u) => u['email'] == email)) {
-      // ⚠️ CAMBIO SOLICITADO: Mensaje específico
       throw CustomError('Ese correo electrónico ya está ligado a otra cuenta');
     }
 
-    // 2. Verificación de Código de Clase (Solo Profesores)
+    // 2. ⚠️ Validación Usuario
+    if (_mockDatabase.any((u) => u['username'].toString().toLowerCase() == username.toLowerCase())) {
+      throw CustomError('Ese nombre de usuario ya está en uso');
+    }
+
+    // 3. Validación Código de Clase
     if (role == 'teacher' && createdClassCode != null) {
       if (_activeClassCodes.contains(createdClassCode.toUpperCase())) {
         throw CustomError('El código de clase ya está en uso');
@@ -91,14 +94,16 @@ class MockAuthDataSource {
       _activeClassCodes.add(createdClassCode.toUpperCase());
     }
 
-    // 3. Guardado Exitoso
+    // 4. Guardado
     _mockDatabase.add({
       'email': email,
       'password': password,
       'name': name,
+      'username': username, // Guardamos
       'role': role,
       'phone': phone,
-      'photo': photoUrl,
     });
+    
+    print('✅ Usuario guardado: $username ($email)');
   }
 }

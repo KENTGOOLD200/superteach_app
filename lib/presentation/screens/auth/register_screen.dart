@@ -1,7 +1,7 @@
 // ============================================================================
 // ARCHIVO: REGISTER_SCREEN.DART
 // CAPA: PRESENTATION / SCREENS / AUTH
-// DESCRIPCIÓN: PANTALLA DE REGISTRO DE USUARIO
+// DESCRIPCIÓN: PANTALLA DE REGISTRO (CON CAMPO USUARIO)
 // ============================================================================
 
 import 'package:flutter/material.dart';
@@ -19,16 +19,12 @@ class RegisterScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Escuchar el estado y el notificador
+    // Referencias al estado y notificador
     final registerState = ref.watch(registerProvider);
     final registerNotifier = ref.read(registerProvider.notifier);
     final textStyles = Theme.of(context).textTheme;
 
-    // Helper: ¿La URL es válida para intentar descargarla?
-    final bool isPhotoValid = registerState.photoUrl.isNotEmpty && AppValidators.photoUrl(registerState.photoUrl) == null;
-
     return Scaffold(
-      // --- BARRA SUPERIOR (TRANSPARENTE) ---
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -36,6 +32,7 @@ class RegisterScreen extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
           onPressed: () => context.go('/login'),
         ),
+        // CONSERVADO: Tus cambios en el título
         centerTitle: true,
         title: Text('Crear Cuenta', style: textStyles.headlineMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
@@ -45,48 +42,16 @@ class RegisterScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // CONSERVADO: Tu mensaje centrado
               Center(
                 child: Text('Completa todos los campos obligatorios (*)', style: textStyles.bodySmall?.copyWith(color: neonCyan)),
               ),
               const Gap(30),
 
               // ==============================================================
-              // 1. SECCIÓN DE FOTO DE PERFIL (CON IMAGEN POR DEFECTO)
+              // FORMULARIO DE DATOS
               // ==============================================================
-              Center(
-                child: Column(
-                  children: [
-                    Container(
-                      height: 100, width: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: isPhotoValid ? neonCyan : Colors.grey.withOpacity(0.5), width: 2),
-                        color: Colors.white10,
-                        // Si es válida, usamos NetworkImage como fondo del container
-                        image: isPhotoValid 
-                          ? DecorationImage(image: NetworkImage(registerState.photoUrl), fit: BoxFit.cover)
-                          : null
-                      ),
-                      // Si NO es válida (o está vacía), mostramos el Asset local
-                      child: !isPhotoValid 
-                        ? ClipOval(
-                            child: Image.asset(
-                              'assets/images/default_profile.png', // 👈 Asegúrate de tener este archivo
-                              fit: BoxFit.cover,
-                            ),
-                          )
-                        : null,
-                    ),
-                    const Gap(10),
-                    const Text("Tu Foto de Perfil", style: TextStyle(color: Colors.white54, fontSize: 12)),
-                  ],
-                ),
-              ),
-              const Gap(20),
-
-              // ==============================================================
-              // 2. FORMULARIO DE DATOS PERSONALES
-              // ==============================================================
+              
               CustomTextFormField(
                 label: 'Nombre Completo (*)',
                 prefixIcon: Icons.person_outline,
@@ -95,13 +60,15 @@ class RegisterScreen extends ConsumerWidget {
               ),
               const Gap(20),
 
+              // ⚠️ NUEVO CAMPO: USUARIO
               CustomTextFormField(
-                label: 'URL Foto (Opcional)',
-                hint: 'https://...',
-                prefixIcon: Icons.image_outlined,
-                onChanged: registerNotifier.onPhotoUrlChanged,
-                errorMessage: registerState.isFormPosted || registerState.photoUrl.isNotEmpty
-                   ? AppValidators.photoUrl(registerState.photoUrl) : null,
+                label: 'Usuario (*)',
+                hint: 'Crea un nombre de usuario único',
+                prefixIcon: Icons.alternate_email,
+                onChanged: registerNotifier.onUsernameChanged,
+                errorMessage: registerState.isFormPosted 
+                    ? (AppValidators.username(registerState.username) ?? (registerState.usernameError.isNotEmpty ? registerState.usernameError : null))
+                    : null,
               ),
               const Gap(20),
 
@@ -147,7 +114,7 @@ class RegisterScreen extends ConsumerWidget {
               const Gap(30),
 
               // ==============================================================
-              // 3. SELECCIÓN DE ROL (PROFESOR / ESTUDIANTE)
+              // SELECCIÓN DE ROL
               // ==============================================================
               _RoleSelector(
                 isTeacher: registerState.role == UserRole.teacher,
@@ -156,7 +123,7 @@ class RegisterScreen extends ConsumerWidget {
               const Gap(20),
 
               // ==============================================================
-              // 4. ZONA DINÁMICA (CÓDIGO DE CLASE)
+              // ZONA DINÁMICA DE CÓDIGO (CONSERVADA)
               // ==============================================================
               Container(
                 padding: const EdgeInsets.all(20),
@@ -166,7 +133,7 @@ class RegisterScreen extends ConsumerWidget {
                   border: Border.all(color: Colors.white10),
                 ),
                 child: registerState.role == UserRole.teacher 
-                  // --- CASO A: PROFESOR (CREA CÓDIGO) ---
+                  // --- VISTA DE PROFESOR ---
                   ? Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -183,14 +150,14 @@ class RegisterScreen extends ConsumerWidget {
                         ),
                       ],
                     )
-                  // --- CASO B: ESTUDIANTE (OPCIONAL UNIRSE A CLASE) ---
+                  // --- VISTA DE ESTUDIANTE (CON SWITCH) ---
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text("Zona de Estudiante", style: TextStyle(color: neonCyan, fontWeight: FontWeight.bold)),
                         const Gap(10),
                         
-                        // SWITCH RESTAURADO: ¿TIENE CÓDIGO?
+                        // SWITCH
                         SwitchListTile(
                           title: const Text('¿Tienes un Código de Clase?', style: TextStyle(color: Colors.white)),
                           subtitle: const Text('Activa si te vas a unir a una clase', style: TextStyle(color: Colors.white54, fontSize: 12)),
@@ -200,7 +167,7 @@ class RegisterScreen extends ConsumerWidget {
                           onChanged: registerNotifier.onStudentTypeChanged,
                         ),
 
-                        // Renderizado Condicional: Solo muestra input si el switch está ON
+                        // Renderizado Condicional
                         if (registerState.hasClassCode) ...[
                           const Gap(15),
                           CustomTextFormField(
@@ -220,7 +187,7 @@ class RegisterScreen extends ConsumerWidget {
               const Gap(40),
 
               // ==============================================================
-              // 5. BOTÓN DE ACCIÓN (SUBMIT)
+              // BOTÓN FINAL
               // ==============================================================
               SizedBox(
                 width: double.infinity,
@@ -266,7 +233,7 @@ class RegisterScreen extends ConsumerWidget {
   }
 }
 
-// Widget auxiliar para el selector principal de Profesor/Estudiante
+// Widget auxiliar del selector de rol (conservado)
 class _RoleSelector extends StatelessWidget {
   final bool isTeacher;
   final Function(bool) onChanged;
