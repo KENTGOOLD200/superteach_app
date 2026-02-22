@@ -99,6 +99,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
             behavior: SnackBarBehavior.floating,
           ),
         );
+        context.go('/home'); // NAVEGACIÓN SEGURA A HOME
       }
     });
 
