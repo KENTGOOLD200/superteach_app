@@ -78,7 +78,9 @@ class RegisterScreen extends ConsumerWidget {
                 prefixIcon: Icons.phone_android_outlined,
                 keyboardType: TextInputType.number,
                 onChanged: registerNotifier.onPhoneChanged,
-                errorMessage: registerState.isFormPosted ? AppValidators.phone(registerState.phone) : null,
+                errorMessage: registerState.isFormPosted 
+                    ? (AppValidators.phone(registerState.phone) ?? (registerState.phoneError.isNotEmpty ? registerState.phoneError : null))
+                    : null,
               ),
               const Gap(20),
 

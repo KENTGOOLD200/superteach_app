@@ -35,6 +35,7 @@ class RegisterState {
   final String emailError;
   final String usernameError; // ⚠️ NUEVO ERROR
   final String classCodeError;
+  final String phoneError; // 🚦 NUEVO ERROR
 
   RegisterState({
     this.isPosting = false,
@@ -53,6 +54,7 @@ class RegisterState {
     this.emailError = '',
     this.usernameError = '',
     this.classCodeError = '',
+    this.phoneError = '', // ⚠️ 2. INICIALÍZALA AQUÍ EN EL CONSTRUCTOR
   });
 
   RegisterState copyWith({
@@ -72,6 +74,7 @@ class RegisterState {
     String? emailError,
     String? usernameError,
     String? classCodeError,
+    String? phoneError, // ⚠️ 3. AÑADE EL NUEVO ERROR AQUÍ
   }) => RegisterState(
     isPosting: isPosting ?? this.isPosting,
     isFormPosted: isFormPosted ?? this.isFormPosted,
@@ -89,6 +92,7 @@ class RegisterState {
     emailError: emailError ?? this.emailError,
     usernameError: usernameError ?? this.usernameError,
     classCodeError: classCodeError ?? this.classCodeError,
+    phoneError: phoneError ?? this.phoneError, // ⚠️ 4. AÑADE EL NUEVO ERROR AQUÍ
   );
 }
 
@@ -229,9 +233,21 @@ class RegisterNotifier extends AutoDisposeNotifier<RegisterState> {
       return true;
     } catch (e) {
       final String errorMessage = (e is CustomError) ? e.message : e.toString();
-      state = state.copyWith(isPosting: false, emailError: errorMessage);
-      return false;
-    }
+      
+      // 🚦 ENRUTADOR DE ERRORES INTELIGENTE
+      final lowerError = errorMessage.toLowerCase();
+      
+      // Buscamos solo "tel" para evitar problemas de tildes o codificación de red
+      if (lowerError.contains('teléfono') || lowerError.contains('telefono') || lowerError.contains('tel')) {
+        state = state.copyWith(isPosting: false, phoneError: errorMessage);
+      } 
+      else if (lowerError.contains('usuario')) {
+        state = state.copyWith(isPosting: false, usernameError: errorMessage);
+      } 
+      else {
+        state = state.copyWith(isPosting: false, emailError: errorMessage);
+      }
+      return false;}
   }
 }
 
