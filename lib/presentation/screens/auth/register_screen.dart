@@ -202,7 +202,7 @@ class RegisterScreen extends ConsumerWidget {
                         if (success && context.mounted) {
                           // ÉXITO
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('¡Bienvenido a SuperTeach!'), backgroundColor: neonCyan),
+                            const SnackBar(content: Text('¡Usuario creado exitosamente! Por favor, inicia sesión.'), backgroundColor: neonCyan),
                           );
                           context.go('/login');
                         } else if (context.mounted) {

@@ -6,14 +6,22 @@
 // toda la aplicación. Es independiente de la base de datos o API.
 // ============================================================================
 
-enum UserRole { student, teacher, admin }
+// ============================================================================
+// ENTIDAD DE DOMINIO: USUARIO
+// ============================================================================
+enum UserRole { student, teacher }
 
 class User {
   final String id;
   final String email;
   final String fullName;
-  final UserRole role; // Define si es Profesor o Estudiante
-  final String token;  // Llave de seguridad para peticiones al backend
+  final UserRole role; 
+  final String token;  
+
+  // --- CAMPOS DINÁMICOS DE CLASES ---
+  final String teacherClassCode; 
+  final bool hasClassCode;       
+  final String studentClassCode; 
 
   User({
     required this.id,
@@ -21,9 +29,22 @@ class User {
     required this.fullName,
     required this.role,
     required this.token,
+    
+    // Inicializamos con valores por defecto para evitar errores con cuentas viejas
+    this.teacherClassCode = '',
+    this.hasClassCode = false,
+    this.studentClassCode = '',
   });
 
-  // Getter auxiliar para preguntar fácilmente si es profesor
-  // Uso: if (user.isTeacher) { ... }
+  // ==========================================================================
+  // GETTERS INTELIGENTES (Para tu interfaz de Home)
+  // ==========================================================================
+  
   bool get isTeacher => role == UserRole.teacher;
+  
+  bool get isStudent => role == UserRole.student; 
+
+  bool get isStudentWithClass => role == UserRole.student && hasClassCode == true;
+
+  bool get isIndependentStudent => role == UserRole.student && hasClassCode == false;
 }

@@ -161,24 +161,12 @@ class RegisterNotifier extends AutoDisposeNotifier<RegisterState> {
 
   void onTeacherCodeChanged(String value) {
     state = state.copyWith(teacherClassCode: value.toUpperCase(), classCodeError: '');
-    if (value.length < 4) { _validateForm(); return; }
-    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      final exists = await authDataSource.checkClassCodeExists(value);
-      if (exists) state = state.copyWith(classCodeError: 'Este código ya está en uso, elige otro.');
       _validateForm();
-    });
   }
 
   void onStudentCodeChanged(String value) {
     state = state.copyWith(studentClassCode: value.toUpperCase(), classCodeError: '');
-    if (value.length < 4) { _validateForm(); return; }
-    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
-      final exists = await authDataSource.checkClassCodeExists(value);
-      if (!exists) state = state.copyWith(classCodeError: 'Este código de clase no existe');
-      _validateForm();
-    });
+    _validateForm();
   }
 
   // --- VALIDACIÓN CENTRAL ---
@@ -227,6 +215,8 @@ class RegisterNotifier extends AutoDisposeNotifier<RegisterState> {
         role: state.role == UserRole.teacher ? 'teacher' : 'student',
         phone: state.phone.trim(),
         createdClassCode: state.role == UserRole.teacher ? state.teacherClassCode : null,
+        hasClassCode: state.hasClassCode,
+        studentClassCode: state.studentClassCode,
       );
       
       state = state.copyWith(isPosting: false);
@@ -244,6 +234,9 @@ class RegisterNotifier extends AutoDisposeNotifier<RegisterState> {
       else if (lowerError.contains('usuario')) {
         state = state.copyWith(isPosting: false, usernameError: errorMessage);
       } 
+      else if (lowerError.contains('código') || lowerError.contains('codigo') || lowerError.contains('clase')) {
+        state = state.copyWith(isPosting: false, classCodeError: errorMessage);
+      }
       else {
         state = state.copyWith(isPosting: false, emailError: errorMessage);
       }
