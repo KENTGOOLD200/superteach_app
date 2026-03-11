@@ -17,6 +17,7 @@ class User {
   final String fullName;
   final UserRole role; 
   final String token;  
+  final String profilePicture;
 
   // --- CAMPOS DINÁMICOS DE CLASES ---
   final String teacherClassCode; 
@@ -29,6 +30,7 @@ class User {
     required this.fullName,
     required this.role,
     required this.token,
+    this.profilePicture = '',
     
     // Inicializamos con valores por defecto para evitar errores con cuentas viejas
     this.teacherClassCode = '',

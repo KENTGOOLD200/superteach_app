@@ -9,6 +9,7 @@ import 'package:superteach_app/presentation/screens/auth/register_screen.dart';
 import 'package:superteach_app/presentation/screens/resources/resources_screen.dart';
 import 'package:superteach_app/presentation/screens/home/home_screen.dart';
 import 'package:superteach_app/presentation/providers/auth_provider.dart';
+import 'package:superteach_app/presentation/screens/quiz/quiz_screen.dart'; // Ajusta tu ruta
 // ============================================================================
 // CONFIGURACIÓN: ROUTER (SISTEMA DE NAVEGACIÓN)
 // ============================================================================
@@ -94,6 +95,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
       path: '/resources',
       builder: (context, state) => const ResourcesScreen(),
+      ),
+
+      // 6. RUTA: CUESTIONARIO
+      GoRoute(
+        path: '/quiz',
+        builder: (context, state) {
+          // Extraemos los datos que le enviamos al navegar
+          final extraData = state.extra as Map<String, dynamic>;
+          return QuizScreen(
+            quizData: extraData['quizData'],
+            themeColor: extraData['themeColor'],
+          );
+        },
       ),
 
     ],

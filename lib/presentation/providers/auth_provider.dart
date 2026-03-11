@@ -3,6 +3,7 @@ import 'package:superteach_app/domain/entities/user.dart';
 import 'package:superteach_app/domain/errors/auth_errors.dart';
 import 'package:superteach_app/infrastructure/datasources/auth_datasource_impl.dart';
 import 'package:superteach_app/infrastructure/services/key_value_storage_service.dart';
+import 'package:superteach_app/config/api_client.dart';
 
 // ============================================================================
 // PROVIDER: AUTENTICACIÓN (LOGIN)
@@ -96,41 +97,75 @@ class AuthNotifier extends Notifier<AuthState> {
   // LOGIN (Actualizado para guardar datos)
   // ==========================================================================
   Future<void> loginUser(String email, String password, bool isTeacherLogin) async {
+    // 1. Avisamos a la UI que estamos cargando
     state = state.copyWith(status: AuthStatus.checking, errorMessage: '');
-
+    
     try {
-      final user = await authDataSource.login(email, password);
+      // 2. Disparamos la petición HTTP al servidor Node.js
+      final response = await ApiClient.client.post('/users/login', data: {
+        "email": email,
+        "password": password
+      });
 
-      if (isTeacherLogin && !user.isTeacher) {
-        throw RoleMismatchError('Esta cuenta es de Estudiante, no de Profesor.');
+      // 3. Revisamos si el backend nos dijo "todo ok" (status 200)
+      if (response.statusCode == 200) {
+        final data = response.data['data'];
+        
+        // 4. Extraemos el rol que nos manda MongoDB ('teacher' o 'student')
+        final String userRoleString = data['role'];
+        final isTeacher = userRoleString == 'teacher';
+
+        // 5. 🛡️ POLICÍA DE ROLES: Evitamos que crucen puertas equivocadas
+        if (isTeacherLogin && !isTeacher) {
+          return logout('Esta cuenta es de Estudiante, no de Profesor.');
+        }
+        if (!isTeacherLogin && isTeacher) {
+          return logout('Los profesores deben ingresar en Modo Profesor.');
+        }
+        
+        // 6. Creamos el usuario adaptándolo a tu clase User de Dart
+        final loggedUser = User(
+          id: data['id'],
+          fullName: data['name'],
+          email: data['email'],
+          // Convertimos el String de Node a tu Enum UserRole de Dart
+          role: isTeacher ? UserRole.teacher : UserRole.student, 
+          token: data['token'], // 👈 Usamos el token que viene de Node
+          teacherClassCode: data['teacherClassCode'] ?? "",
+          hasClassCode: data['hasClassCode'] ?? false,
+          studentClassCode: data['studentClassCode'] ?? "",
+        );
+
+        // 7. Guardamos TODO en la caja fuerte local (SharedPreferences)
+        await keyValueStorageService.setKeyValue('token', loggedUser.token);
+        await keyValueStorageService.setKeyValue('id', loggedUser.id);
+        await keyValueStorageService.setKeyValue('email', loggedUser.email);
+        await keyValueStorageService.setKeyValue('fullName', loggedUser.fullName);
+        await keyValueStorageService.setKeyValue('role', userRoleString);
+        await keyValueStorageService.setKeyValue('teacherClassCode', loggedUser.teacherClassCode);
+        await keyValueStorageService.setKeyValue('hasClassCode', loggedUser.hasClassCode.toString());
+        await keyValueStorageService.setKeyValue('studentClassCode', loggedUser.studentClassCode);
+
+        // 8. Actualizamos el estado para que el Router nos mande al Home
+        state = state.copyWith(
+          status: AuthStatus.authenticated,
+          user: loggedUser,
+          errorMessage: '',
+        );
+        
+        print("✅ ¡Login real exitoso! Bienvenido ${loggedUser.fullName}");
+        
+      } else {
+        // 9. Manejamos los errores que nos manda Node.js (ej. 401 Contraseña incorrecta)
+        final errorMsg = response.data['error'] ?? 'Error desconocido';
+        logout(errorMsg); // 👈 Pintará tus inputs de rojo
       }
-      if (!isTeacherLogin && user.isTeacher) {
-        throw RoleMismatchError('Los profesores deben ingresar en Modo Profesor.');
-      }
-      
-      // 👈 3. ¡EL LOGIN FUE UN ÉXITO! Guardamos en la caja fuerte
-      await keyValueStorageService.setKeyValue('token', user.token);
-      await keyValueStorageService.setKeyValue('id', user.id);
-      await keyValueStorageService.setKeyValue('email', user.email);
-      await keyValueStorageService.setKeyValue('fullName', user.fullName);
-      await keyValueStorageService.setKeyValue('role', user.isTeacher ? 'teacher' : 'student');
-      await keyValueStorageService.setKeyValue('teacherClassCode', user.teacherClassCode);
-      await keyValueStorageService.setKeyValue('hasClassCode', user.hasClassCode.toString());
-      await keyValueStorageService.setKeyValue('studentClassCode', user.studentClassCode);
 
-      state = state.copyWith(status: AuthStatus.authenticated, user: user, errorMessage: '');
-
-    } on WrongCredentials {
-      logout('Credenciales incorrectas');
-    } on RoleMismatchError catch (e) {
-      logout(e.message);
-    } on CustomError catch (e) {
-      logout(e.message); 
     } catch (e) {
-      logout('Error no controlado');
+      // Error fatal: El servidor Node.js está apagado o no hay internet
+      logout('Error de conexión. ¿Está encendido tu servidor local?');
     }
   }
-
   // ==========================================================================
   // LOGOUT (Actualizado para limpiar memoria)
   // ==========================================================================
