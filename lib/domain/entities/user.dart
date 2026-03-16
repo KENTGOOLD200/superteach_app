@@ -6,9 +6,6 @@
 // toda la aplicación. Es independiente de la base de datos o API.
 // ============================================================================
 
-// ============================================================================
-// ENTIDAD DE DOMINIO: USUARIO
-// ============================================================================
 enum UserRole { student, teacher }
 
 class User {
@@ -18,6 +15,10 @@ class User {
   final UserRole role; 
   final String token;  
   final String profilePicture;
+
+  // ⚠️ NUEVOS CAMPOS AÑADIDOS PARA EL PERFIL
+  final String username;
+  final String phone;
 
   // --- CAMPOS DINÁMICOS DE CLASES ---
   final String teacherClassCode; 
@@ -31,6 +32,10 @@ class User {
     required this.role,
     required this.token,
     this.profilePicture = '',
+    
+    // ⚠️ Inicializamos vacíos para no romper inicios de sesión antiguos
+    this.username = '',
+    this.phone = '',
     
     // Inicializamos con valores por defecto para evitar errores con cuentas viejas
     this.teacherClassCode = '',

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -53,32 +55,75 @@ class HomeScreen extends ConsumerWidget {
             offset: const Offset(0, 50),
             onSelected: (value) {
               if (value == 'profile') {
-                // TODO: Navegar a la pantalla de perfil
-                print("Ir a perfil"); 
-              } else if (value == 'logout') {
-                ref.read(authProvider.notifier).logout(); 
+                context.push('/profile', extra: {
+                  'name': user.fullName,
+                  'username': user.username,
+                  'phone': user.phone,
+                  'profilePicture': user.profilePicture,
+                  'role': user.role.name,
+                  'hasClassCode': user.hasClassCode, // Tu lógica de clase
+                  'token': user.token,
+                });
               }
+              else if (value == 'logout') {
+                ref.read(authProvider.notifier).logout(); 
+              } 
             },
             // El ícono que dispara el menú (La foto de perfil)
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12.0),
-              child: CircleAvatar(
+              child: Builder(builder: (context) {
+              ImageProvider? avatarImage;
+              if (user.profilePicture.isNotEmpty) {
+                if (user.profilePicture.startsWith('data:image')) {
+                  try {
+                    avatarImage = MemoryImage(
+                      base64Decode(user.profilePicture.split(',').last),
+                    );
+                  } catch (_) {
+                    avatarImage = null;
+                  }
+                } else {
+                  avatarImage = NetworkImage(user.profilePicture);
+                }
+              }
+
+              return CircleAvatar(
                 radius: 18,
                 backgroundColor: neonCyan.withValues(alpha: 0.2),
-                backgroundImage: user.profilePicture.isNotEmpty 
-                    ? NetworkImage(user.profilePicture) 
-                    : null,
+                backgroundImage: avatarImage,
                 // Si no hay foto, mostramos un ícono de usuario neón
-                child: user.profilePicture.isEmpty 
-                    ? const Icon(Icons.person, color: neonCyan) 
-                    : null,
-              ),
+                child: avatarImage == null ? const Icon(Icons.person, color: neonCyan) : null,
+              );
+            }),
             ),
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-              const PopupMenuItem<String>(
+              PopupMenuItem<String>(
                 value: 'profile',
                 child: ListTile(
-                  leading: Icon(Icons.account_circle, color: neonCyan),
+                  leading: Builder(builder: (context) {
+                    ImageProvider? avatarImage;
+                    if (user.profilePicture.isNotEmpty) {
+                      if (user.profilePicture.startsWith('data:image')) {
+                        try {
+                          avatarImage = MemoryImage(
+                            base64Decode(user.profilePicture.split(',').last),
+                          );
+                        } catch (_) {
+                          avatarImage = null;
+                        }
+                      } else {
+                        avatarImage = NetworkImage(user.profilePicture);
+                      }
+                    }
+
+                    return CircleAvatar(
+                      radius: 16,
+                      backgroundColor: neonCyan.withValues(alpha: 0.2),
+                      backgroundImage: avatarImage,
+                      child: avatarImage == null ? const Icon(Icons.person, color: neonCyan, size: 16) : null,
+                    );
+                  }),
                   title: Text('Mi Perfil', style: TextStyle(color: Colors.white)),
                   contentPadding: EdgeInsets.zero,
                 ),

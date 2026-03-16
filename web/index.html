@@ -1,7 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+
+  <script>
+    // Esperamos a que la página cargue y reconfiguramos Cropper.js
+    window.addEventListener('load', function() {
+      if (window.Cropper) {
+        window.Cropper.setDefaults({
+          autoCropArea: 1.0, // 👈 ¡MAGIA! 1.0 significa 100%. Topará los bordes.
+          viewMode: 1        // 👈 Evita que el cuadro se salga de los límites de la imagen
+        });
+      }
+    });
+  </script>
+
+  <style>
+    .cropper-container {
+      width: 100% !important;
+      max-height: 70vh !important;
+    }
+    .cropper-wrap-box img {
+      max-width: 100% !important;
+    }
+  </style>
+  <!-- 
     If you are serving your web app in a path other than the root, change the
     href value below to reflect the base path you are serving from.
 

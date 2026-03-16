@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 // ============================================================================
 // WIDGET: INPUT DE TEXTO PERSONALIZADO (CON ESTADO DE ERROR VISUAL)
@@ -16,8 +17,10 @@ class CustomTextFormField extends StatelessWidget {
   final String? errorMessage; // 👈 Mensaje de error que viene del Provider
   final bool obscureText;
   final TextInputType? keyboardType;
+  final bool enabled;
   final Function(String)? onChanged;
   final String? Function(String?)? validator;
+  final List<TextInputFormatter>? inputFormatters;
   final IconData? prefixIcon;
   final TextEditingController? controller;
 
@@ -28,8 +31,10 @@ class CustomTextFormField extends StatelessWidget {
     this.errorMessage, // Si esto no es null, el campo se pone rojo
     this.obscureText = false,
     this.keyboardType = TextInputType.text,
+    this.enabled = true,
     this.onChanged,
     this.validator,
+    this.inputFormatters,
     this.prefixIcon,
     this.controller,
   });
@@ -64,7 +69,9 @@ class CustomTextFormField extends StatelessWidget {
       ),
       child: TextFormField(
         controller: controller,
+        enabled: enabled,
         onChanged: onChanged,
+        inputFormatters: inputFormatters,
         validator: validator,
         obscureText: obscureText,
         keyboardType: keyboardType,

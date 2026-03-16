@@ -9,7 +9,8 @@ import 'package:superteach_app/presentation/screens/auth/register_screen.dart';
 import 'package:superteach_app/presentation/screens/resources/resources_screen.dart';
 import 'package:superteach_app/presentation/screens/home/home_screen.dart';
 import 'package:superteach_app/presentation/providers/auth_provider.dart';
-import 'package:superteach_app/presentation/screens/quiz/quiz_screen.dart'; // Ajusta tu ruta
+import 'package:superteach_app/presentation/screens/quiz/quiz_screen.dart'; 
+import 'package:superteach_app/presentation/screens/profile/profile_screen.dart';
 // ============================================================================
 // CONFIGURACIÓN: ROUTER (SISTEMA DE NAVEGACIÓN)
 // ============================================================================
@@ -106,6 +107,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return QuizScreen(
             quizData: extraData['quizData'],
             themeColor: extraData['themeColor'],
+          );
+        },
+      ),
+
+      // 7. RUTA: PERFIL (Ajustes y Foto de Perfil)
+     GoRoute(
+        path: '/profile',
+        builder: (context, state) {
+          final extraData = state.extra as Map<String, dynamic>? ?? {};
+          return ProfileScreen(
+            currentName: extraData['name'] ?? 'Usuario',
+            username: extraData['username'] ?? 'usuario_desc',
+            phone: extraData['phone'] ?? '0000000000',
+            profilePicture: extraData['profilePicture'] ?? '',
+            role: extraData['role'] ?? 'student',
+            hasClassCode: extraData['hasClassCode'] ?? false,
+            token: extraData['token'] ?? '',
           );
         },
       ),

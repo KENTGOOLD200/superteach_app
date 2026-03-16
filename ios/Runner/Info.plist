@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>NSCameraUsageDescription</key>
+    <string>SuperTeach necesita acceso a tu cámara para que puedas tomarte una foto de perfil.</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>SuperTeach necesita acceso a tu galería para que elijas tu foto de perfil.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

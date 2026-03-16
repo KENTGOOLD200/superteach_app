@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:superteach_app/domain/entities/user.dart';
 import 'package:superteach_app/domain/errors/auth_errors.dart';
@@ -66,6 +67,9 @@ class AuthNotifier extends Notifier<AuthState> {
       final id = await keyValueStorageService.getValue('id') ?? '';
       final email = await keyValueStorageService.getValue('email') ?? '';
       final fullName = await keyValueStorageService.getValue('fullName') ?? '';
+      final username = await keyValueStorageService.getValue('username') ?? '';
+      final phone = await keyValueStorageService.getValue('phone') ?? '';
+      final profilePicture = await keyValueStorageService.getValue('profilePicture') ?? '';
       final roleString = await keyValueStorageService.getValue('role') ?? 'student';
 
       // 👇 ESTAS 3 LÍNEAS FALTARON 👇 Leemos los datos de las clases
@@ -78,6 +82,9 @@ class AuthNotifier extends Notifier<AuthState> {
         id: id,
         email: email,
         fullName: fullName,
+        username: username,
+        phone: phone,
+        profilePicture: profilePicture,
         role: roleString == 'teacher' ? UserRole.teacher : UserRole.student,
         token: token,
         teacherClassCode: teacherClassCode, // Ahora sí existen estas variables
@@ -87,7 +94,9 @@ class AuthNotifier extends Notifier<AuthState> {
 
       // ¡Le damos acceso directo!
       state = state.copyWith(status: AuthStatus.authenticated, user: user, errorMessage: '');
-      
+
+      // Traemos los campos faltantes desde el backend (en caso de que el login anterior no los incluyera)
+      refreshUserProfile();
     } catch (e) {
       logout();
     }
@@ -128,6 +137,9 @@ class AuthNotifier extends Notifier<AuthState> {
           id: data['id'],
           fullName: data['name'],
           email: data['email'],
+          username: data['username'] ?? '',
+          phone: data['phone'] ?? '',
+          profilePicture: data['profilePicture'] ?? '',
           // Convertimos el String de Node a tu Enum UserRole de Dart
           role: isTeacher ? UserRole.teacher : UserRole.student, 
           token: data['token'], // 👈 Usamos el token que viene de Node
@@ -141,6 +153,9 @@ class AuthNotifier extends Notifier<AuthState> {
         await keyValueStorageService.setKeyValue('id', loggedUser.id);
         await keyValueStorageService.setKeyValue('email', loggedUser.email);
         await keyValueStorageService.setKeyValue('fullName', loggedUser.fullName);
+        await keyValueStorageService.setKeyValue('username', loggedUser.username);
+        await keyValueStorageService.setKeyValue('phone', loggedUser.phone);
+        await keyValueStorageService.setKeyValue('profilePicture', loggedUser.profilePicture);
         await keyValueStorageService.setKeyValue('role', userRoleString);
         await keyValueStorageService.setKeyValue('teacherClassCode', loggedUser.teacherClassCode);
         await keyValueStorageService.setKeyValue('hasClassCode', loggedUser.hasClassCode.toString());
@@ -152,7 +167,10 @@ class AuthNotifier extends Notifier<AuthState> {
           user: loggedUser,
           errorMessage: '',
         );
-        
+
+        // Aseguramos que tenemos los campos más completos posibles (ej. username / phone)
+        await refreshUserProfile();
+
         print("✅ ¡Login real exitoso! Bienvenido ${loggedUser.fullName}");
         
       } else {
@@ -166,6 +184,76 @@ class AuthNotifier extends Notifier<AuthState> {
       logout('Error de conexión. ¿Está encendido tu servidor local?');
     }
   }
+
+  // ==========================================================================
+  // ACTUALIZAR PERFIL (Sin tener que volver a loguear)
+  // ==========================================================================
+  Future<void> updateUserProfile({
+    String? fullName,
+    String? username,
+    String? phone,
+    String? profilePicture,
+  }) async {
+    final currentUser = state.user;
+    if (currentUser == null) return;
+
+    final updatedUser = User(
+      id: currentUser.id,
+      email: currentUser.email,
+      fullName: fullName ?? currentUser.fullName,
+      username: username ?? currentUser.username,
+      phone: phone ?? currentUser.phone,
+      profilePicture: profilePicture ?? currentUser.profilePicture,
+      role: currentUser.role,
+      token: currentUser.token,
+      teacherClassCode: currentUser.teacherClassCode,
+      hasClassCode: currentUser.hasClassCode,
+      studentClassCode: currentUser.studentClassCode,
+    );
+
+    // Persistimos los nuevos datos
+    await keyValueStorageService.setKeyValue('fullName', updatedUser.fullName);
+    await keyValueStorageService.setKeyValue('username', updatedUser.username);
+    await keyValueStorageService.setKeyValue('phone', updatedUser.phone);
+    await keyValueStorageService.setKeyValue('profilePicture', updatedUser.profilePicture);
+
+    state = state.copyWith(user: updatedUser);
+  }
+
+  // ==========================================================================
+  // REFRESCAR PERFIL DESDE EL BACKEND (por si no viene todo en login)
+  // ==========================================================================
+  Future<void> refreshUserProfile() async {
+    final token = await keyValueStorageService.getValue('token');
+    if (token == null) return;
+
+    try {
+      final response = await ApiClient.client.get(
+        '/users/profile',
+        options: Options(
+          headers: {'Authorization': 'Bearer $token'},
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final payload = response.data is Map ? response.data as Map<String, dynamic> : {};
+        final serverUser = (payload['user'] ?? payload['data'] ?? payload) as Map<String, dynamic>?;
+
+        if (serverUser != null) {
+          // Actualizamos los campos que pudieran venir desde el servidor
+          await updateUserProfile(
+            fullName: serverUser['name'] as String?,
+            username: serverUser['username'] as String?,
+            phone: serverUser['phone'] as String?,
+            profilePicture: serverUser['profilePicture'] as String?,
+          );
+        }
+      }
+    } catch (_) {
+      // Ignoramos (no es crítico), la app seguirá mostrando lo que ya conoce.
+    }
+  }
+
   // ==========================================================================
   // LOGOUT (Actualizado para limpiar memoria)
   // ==========================================================================

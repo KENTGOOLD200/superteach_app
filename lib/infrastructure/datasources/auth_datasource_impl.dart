@@ -57,6 +57,8 @@ class MockAuthDataSource {
           teacherClassCode: userData['teacherClassCode'] ?? '',
           hasClassCode: userData['hasClassCode'] ?? false,
           studentClassCode: userData['studentClassCode'] ?? '',
+          username: userData['username'] ?? '',
+          phone: userData['phone'] ?? '',
         );
       }
       
