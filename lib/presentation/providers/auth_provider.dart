@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:superteach_app/domain/entities/user.dart';
-import 'package:superteach_app/domain/errors/auth_errors.dart';
 import 'package:superteach_app/infrastructure/datasources/auth_datasource_impl.dart';
 import 'package:superteach_app/infrastructure/services/key_value_storage_service.dart';
 import 'package:superteach_app/config/api_client.dart';

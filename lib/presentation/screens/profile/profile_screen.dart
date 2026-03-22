@@ -177,7 +177,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           "name": _nameCtrl.text.trim(),
           "username": _userCtrl.text.trim(),
           "phone": _phoneCtrl.text.trim(),
-          if (base64Image != null) "profilePicture": base64Image, 
+          "profilePicture": ?base64Image, 
         },
         options: Options(
           headers: {

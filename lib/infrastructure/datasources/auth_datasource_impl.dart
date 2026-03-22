@@ -71,7 +71,7 @@ class MockAuthDataSource {
       }
       throw CustomError('Error de conexión con el servidor.');
     } catch (e) {
-      if (e is CustomError) throw e;
+      if (e is CustomError) rethrow;
       throw CustomError('Ocurrió un error inesperado');
     }
   }

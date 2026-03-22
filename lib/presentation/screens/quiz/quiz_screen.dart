@@ -1,7 +1,11 @@
 import 'dart:math' as math;
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:go_router/go_router.dart';
 import 'package:superteach_app/config/theme/app_theme.dart';
+import 'package:superteach_app/domain/entities/user.dart';
+import 'package:superteach_app/config/api_client.dart';
 
 // ============================================================================
 // PANTALLA: CUESTIONARIO GAMIFICADO (AVANCE POR TOQUE EN PANTALLA)
@@ -10,19 +14,22 @@ import 'package:superteach_app/config/theme/app_theme.dart';
 class QuizScreen extends StatefulWidget {
   final List<dynamic> quizData;
   final Color themeColor;
+  final String? quizId; 
+  final User? user;     
 
   const QuizScreen({
     super.key,
     required this.quizData,
     required this.themeColor,
+    this.quizId,
+    this.user,
   });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
 }
 
-class _QuizScreenState extends State<QuizScreen>
-    with SingleTickerProviderStateMixin {
+class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   int _score = 0;
   bool _isAnswered = false;
@@ -35,7 +42,6 @@ class _QuizScreenState extends State<QuizScreen>
   late Animation<double> _pulseAnimation;
 
   @override
-  /// Inicializa el controlador de animación y carga la primera pregunta.
   void initState() {
     super.initState();
     _pulseController = AnimationController(
@@ -49,7 +55,6 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   @override
-  /// Libera los recursos del controlador de animación.
   void dispose() {
     _pulseController.dispose();
     super.dispose();
@@ -123,6 +128,12 @@ class _QuizScreenState extends State<QuizScreen>
 
   /// Muestra el diálogo con los resultados finales del quiz.
   void _showResults() {
+    _submitScore(_score, widget.quizData.length);
+  }
+
+  /// Muestra un diálogo con el resultado y un mensaje opcional.
+  void _showResultsDialog(int displayScore, int displayMax, int correctAnswers, int totalQuestions,
+      {String? message, bool isError = false}) {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -140,7 +151,7 @@ class _QuizScreenState extends State<QuizScreen>
             ),
             title: Column(
               children: [
-                Icon(Icons.emoji_events, color: neonCyan, size: 60),
+                Icon(Icons.emoji_events, color: widget.themeColor, size: 60),
                 const SizedBox(height: 10),
                 Text(
                   '¡Cuestionario Terminado!',
@@ -149,16 +160,41 @@ class _QuizScreenState extends State<QuizScreen>
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (message != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: isError ? Colors.redAccent : Colors.greenAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ],
             ),
-            content: Text(
-              'Tu puntuación:\n$_score / ${widget.quizData.length}',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Tu puntuación:\n$displayScore / $displayMax',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Correctas: $correctAnswers / $totalQuestions',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
             ),
             actionsAlignment: MainAxisAlignment.center,
             actions: [
@@ -186,8 +222,8 @@ class _QuizScreenState extends State<QuizScreen>
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: () {
-                      context.pop();
-                      context.pop();
+                      context.pop(); // Cierra el modal de resultados
+                      context.pop(); // Vuelve a la pantalla anterior
                     },
                     icon: Icon(Icons.home, color: widget.themeColor),
                     label: Text(
@@ -200,7 +236,7 @@ class _QuizScreenState extends State<QuizScreen>
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 15),
                       side: BorderSide(
-                        color: widget.themeColor.withValues(alpha: 0.5),
+                        color: widget.themeColor.withOpacity(0.5),
                         width: 2,
                       ),
                       shape: RoundedRectangleBorder(
@@ -215,6 +251,109 @@ class _QuizScreenState extends State<QuizScreen>
         );
       },
     );
+  }
+
+  // ========================================================================
+  // FUNCIÓN: ENVIAR NOTA AL BACKEND AL TERMINAR
+  // ========================================================================
+  Future<void> _submitScore(int correctAnswers, int totalQuestions) async {
+    final int backendScore = ((correctAnswers / totalQuestions) * 100).round();
+    final int displayScore = backendScore;
+    const int displayMax = 100;
+
+    // 1. Si no hay ID de cuestionario, es una práctica suelta. No guardamos.
+    if (widget.quizId == null || widget.user == null) {
+      _showResultsDialog(displayScore, displayMax, correctAnswers, totalQuestions);
+      return;
+    }
+
+    // 2. Mostramos el modal de carga
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF121826),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(color: widget.themeColor),
+            const SizedBox(height: 16),
+            const Text('Guardando tu puntaje...', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      print("📤 Obteniendo cliente HTTP seguro...");
+      
+      // 🚀 ¡AQUÍ ESTÁ LA MAGIA! Usamos tu ApiClient blindado
+      final dio = await ApiClient.authenticatedClient();
+
+      print("📤 Disparando la petición a Node.js...");
+      
+      // 3. Enviamos la nota
+      final response = await dio.post('/quizzes/${widget.quizId}/attempt', data: {
+        "score": backendScore,
+        "correctAnswers": correctAnswers,
+        "totalQuestions": totalQuestions
+      });
+
+      print("✅ Respuesta del servidor: ${response.statusCode}");
+
+      // 4. Cerramos el diálogo de carga
+      if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
+
+      // 5. Validamos si fue exitoso (201 Created o 200 OK)
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        _showResultsDialog(
+          displayScore,
+          displayMax,
+          correctAnswers,
+          totalQuestions,
+          message: "¡Calificación guardada en la nube!",
+        );
+      } else {
+        // Si el servidor responde con 400 (ej: Límite de intentos)
+        final errorMsg = response.data['error'] ?? 'No se pudo guardar la nota.';
+        _showResultsDialog(
+          displayScore,
+          displayMax,
+          correctAnswers,
+          totalQuestions,
+          message: "⚠️ $errorMsg",
+          isError: true,
+        );
+      }
+
+    } on DioException catch (e) {
+      // 🚨 Si hay error de red o de timeout (pasaron los 10 segundos)
+      print("❌ Error de DioException: ${e.message}");
+      if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
+      
+      _showResultsDialog(
+        displayScore,
+        displayMax,
+        correctAnswers,
+        totalQuestions,
+        message: "Error de conexión o tiempo de espera agotado.",
+        isError: true,
+      );
+      
+    } catch (e) {
+      // 🚨 Error inesperado en el código
+      print("❌ Error inesperado: $e");
+      if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
+      
+      _showResultsDialog(
+        displayScore,
+        displayMax,
+        correctAnswers,
+        totalQuestions,
+        message: "Error interno inesperado.",
+        isError: true,
+      );
+    }
   }
 
   /// Construye la interfaz de usuario de la pantalla del quiz.
@@ -257,7 +396,7 @@ class _QuizScreenState extends State<QuizScreen>
               children: [
                 LinearProgressIndicator(
                   value: (_currentIndex + 1) / widget.quizData.length,
-                  backgroundColor: widget.themeColor.withValues(alpha: 0.2),
+                  backgroundColor: widget.themeColor.withOpacity(0.2),
                   color: widget.themeColor,
                   minHeight: 8,
                   borderRadius: BorderRadius.circular(10),
@@ -289,7 +428,7 @@ class _QuizScreenState extends State<QuizScreen>
                             color: const Color(0xFF121826),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: widget.themeColor.withValues(alpha: 0.3),
+                              color: widget.themeColor.withOpacity(0.3),
                             ),
                           ),
                           child: Text(
@@ -315,7 +454,7 @@ class _QuizScreenState extends State<QuizScreen>
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 15),
                             child: TweenAnimationBuilder<double>(
-                              key: ValueKey('shake_$_isAnswered\_$answer'),
+                              key: ValueKey('shake_${_isAnswered}_$answer'),
                               tween: Tween(
                                 begin: 0.0,
                                 end: isThisSelectedWrong ? 1.0 : 0.0,
@@ -337,27 +476,26 @@ class _QuizScreenState extends State<QuizScreen>
                                   builder: (context, child) {
                                     Color btnColor = const Color(0xFF121826);
                                     Color borderColor = widget.themeColor
-                                        .withValues(alpha: 0.5);
+                                        .withOpacity(0.5);
                                     double glowRadius = 0;
 
                                     if (_isAnswered) {
                                       if (isThisCorrectAnswer) {
-                                        btnColor = Colors.green.withValues(
-                                          alpha:
+                                        btnColor = Colors.green.withOpacity(
                                               0.2 +
                                               (_pulseAnimation.value * 0.3),
                                         );
                                         borderColor = Colors.greenAccent;
                                         glowRadius = _pulseAnimation.value * 20;
                                       } else if (isThisSelectedWrong) {
-                                        btnColor = Colors.red.withValues(
-                                          alpha: 0.3,
+                                        btnColor = Colors.red.withOpacity(
+                                          0.3,
                                         );
                                         borderColor = Colors.redAccent;
                                       } else {
                                         btnColor = const Color(
                                           0xFF121826,
-                                        ).withValues(alpha: 0.5);
+                                        ).withOpacity(0.5);
                                         borderColor = Colors.transparent;
                                       }
                                     }
@@ -381,7 +519,7 @@ class _QuizScreenState extends State<QuizScreen>
                                             ? [
                                                 BoxShadow(
                                                   color: Colors.greenAccent
-                                                      .withValues(alpha: 0.6),
+                                                      .withOpacity(0.6),
                                                   blurRadius: glowRadius,
                                                 ),
                                               ]
@@ -422,9 +560,8 @@ class _QuizScreenState extends State<QuizScreen>
             Positioned.fill(
               child: GestureDetector(
                 onTap: _advanceNext,
-                // Le damos un ligero fondo oscuro para resaltar que ahora es un modal
                 child: Container(
-                  color: Colors.black.withValues(alpha: 0.3),
+                  color: Colors.black.withOpacity(0.3),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -458,7 +595,7 @@ class _QuizScreenState extends State<QuizScreen>
                                     (_isCorrectMatch
                                             ? Colors.greenAccent
                                             : Colors.redAccent)
-                                        .withValues(alpha: 0.5),
+                                        .withOpacity(0.5),
                                 blurRadius: 20,
                                 spreadRadius: 5,
                               ),
@@ -483,8 +620,7 @@ class _QuizScreenState extends State<QuizScreen>
                         animation: _pulseAnimation,
                         builder: (context, child) {
                           return Opacity(
-                            opacity: _pulseAnimation
-                                .value, // Usa la misma animación del latido
+                            opacity: _pulseAnimation.value, 
                             child: const Text(
                               'Toca cualquier parte para continuar',
                               style: TextStyle(

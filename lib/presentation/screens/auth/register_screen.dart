@@ -201,19 +201,11 @@ class RegisterScreen extends ConsumerWidget {
                         final success = await registerNotifier.onSubmit();
                         if (success && context.mounted) {
                           // ÉXITO
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('¡Usuario creado exitosamente! Por favor, inicia sesión.'), backgroundColor: neonCyan),
-                          );
+                          AppTheme.showSnackBar(context, '¡Usuario creado exitosamente! Por favor, inicia sesión.', type: SnackBarType.success);
                           context.go('/login');
                         } else if (context.mounted) {
                           // ERROR
-                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                             const SnackBar(
-                                content: Text('No se pudo crear la cuenta'), 
-                                backgroundColor: Colors.redAccent,
-                                behavior: SnackBarBehavior.floating,
-                             ),
+                          AppTheme.showSnackBar(context, 'Error al crear el usuario. Revisa los campos e intenta de nuevo.', type: SnackBarType.error
                           );
                         }
                       },

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart'; // 👈 IMPORTANTE: Necesario para na
 import 'package:superteach_app/config/theme/app_theme.dart';
 import 'package:superteach_app/presentation/providers/auth_provider.dart';
 import 'package:superteach_app/presentation/widgets/inputs/custom_text_form_field.dart';
+import 'package:superteach_app/domain/entities/user.dart';
 
 // ============================================================================
 // PANTALLA DE LOGIN (CON ACCESO A REGISTRO)
@@ -63,6 +64,9 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
     super.dispose();
   }
 
+  // 🎨 Color dinámico según el rol seleccionado
+  Color get dynamicThemeColor => isTeacher ? neonMagenta : neonCyan;
+
   @override
   Widget build(BuildContext context) {
     final textStyles = Theme.of(context).textTheme;
@@ -91,14 +95,7 @@ class _LoginFormState extends ConsumerState<_LoginForm> {
 
       // CASO DE ÉXITO
       if (next.status == AuthStatus.authenticated) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡ACCESO CONCEDIDO! Bienvenido', style: TextStyle(color: Colors.black)),
-            backgroundColor: neonCyan,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+          AppTheme.showSnackBar(context, '¡Bienvenido de nuevo, ${next.user?.fullName.split(" ")[0]}! Has iniciado sesión exitosamente.', type: SnackBarType.success, themeColor: next.user?.role == UserRole.teacher ? neonMagenta : neonCyan);
         context.go('/home'); // NAVEGACIÓN SEGURA A HOME
       }
     });

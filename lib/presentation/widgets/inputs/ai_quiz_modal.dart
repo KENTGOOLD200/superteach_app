@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:dio/dio.dart';
 import 'package:superteach_app/config/theme/app_theme.dart';
-import 'package:superteach_app/config/api_client.dart';
+import 'package:superteach_app/domain/entities/user.dart';
 import 'package:go_router/go_router.dart';
 
 // ============================================================================
 // WIDGET: MODAL PARA GENERAR CUESTIONARIOS CON IA (CONECTADO AL BACKEND)
 // ============================================================================
 
-void showAiQuizModal(BuildContext context, {required Color themeColor}) {
+void showAiQuizModal(BuildContext context, {required User user, required Color themeColor}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true, 
     backgroundColor: Colors.transparent,
-    builder: (context) => _AiQuizModalContent(themeColor: themeColor),
+    builder: (context) => _AiQuizModalContent(user: user, themeColor: themeColor),
   );
 }
 
 class _AiQuizModalContent extends StatefulWidget {
+  final User user;
   final Color themeColor;
-  const _AiQuizModalContent({required this.themeColor});
+  const _AiQuizModalContent({required this.user, required this.themeColor});
 
   @override
   State<_AiQuizModalContent> createState() => _AiQuizModalContentState();
@@ -27,7 +30,9 @@ class _AiQuizModalContent extends StatefulWidget {
 class _AiQuizModalContentState extends State<_AiQuizModalContent> {
   final TextEditingController _topicController = TextEditingController();
   int _questionCount = 5; 
+  final int _selectedAttempts = 0; // 👈 NUEVO: Intentos permitidos (0 = Ilimitados)
   bool _isLoading = false; // 👈 NUEVO: Estado para saber si la IA está pensando
+  String? _topicError; // 👈 NUEVO: Para mostrar error en el input
 
   @override
   void dispose() {
@@ -48,62 +53,80 @@ class _AiQuizModalContentState extends State<_AiQuizModalContent> {
   }
 
   // ==========================================================================
-  // FUNCIÓN: CONECTAR CON LA IA
+  // FUNCIÓN MAESTRA: Genera con IA y luego Guarda en MongoDB
   // ==========================================================================
-  Future<void> _generateQuiz() async {
+  Future<void> _generateAndSaveQuiz() async {
     final topic = _topicController.text.trim();
     if (topic.isEmpty) return;
 
-    // 1. Activamos el modo "Cargando"
     setState(() => _isLoading = true);
 
     try {
-      // 2. Disparamos la petición a tu servidor Node.js
-      final response = await ApiClient.client.post('/ai/generate-quiz', data: {
+      // Configuración de Dio
+      final baseUrl = kIsWeb ? 'http://127.0.0.1:3000/api/v1' : 'http://10.0.2.2:3000/api/v1';
+      final dio = Dio(BaseOptions(
+        baseUrl: baseUrl,
+        headers: {
+          'Authorization': 'Bearer ${widget.user.token}', 
+          'Content-Type': 'application/json'
+        },
+      ));
+
+      // --- A. PEDIMOS A LA IA QUE GENERE LAS PREGUNTAS ---
+      final aiResponse = await dio.post('/ai/generate-quiz', data: {
         "topic": topic,
-        "questionCount": _questionCount,
+        "questionCount": _questionCount
       });
 
-      // 3. Revisamos si la IA nos respondió con éxito
-      if (response.statusCode == 200) {
-        final quizData = response.data['data'];
-        
-        print("✅ ¡FLUTTER RECIBIÓ EL JSON DE LA IA!");
-        print(quizData); // Aquí verás las preguntas en tu terminal de VS Code
+      if (aiResponse.statusCode == 200) {
+        final List<dynamic> generatedQuestions = aiResponse.data['data'];
 
+        // --- B. LO GUARDAMOS AUTOMÁTICAMENTE EN LA BASE DE DATOS ---
+        // 🚨 CAMBIO AQUÍ: Guardamos la respuesta en la variable 'createResponse'
+        final createResponse = await dio.post('/quizzes', data: {
+          "topic": topic,
+          "roleMode": widget.user.role.name,
+          "classCode": widget.user.isTeacher ? widget.user.teacherClassCode : widget.user.studentClassCode,
+          "maxAttempts": widget.user.isTeacher ? _selectedAttempts : 0, 
+          "questions": generatedQuestions
+        });
+
+        // 🕵️‍♂️ ¡EL ESLABÓN PERDIDO! Extraemos el ID que MongoDB le acaba de asignar
+        final String newQuizId = createResponse.data['data']['_id'];
+
+        // --- C. CERRAMOS MODAL Y AVISAMOS ---
         if (mounted) {
-          // Cerramos el modal
-          Navigator.pop(context); 
+          Navigator.pop(context); // Cierra el modal
           
-          // Viajamos a la arena pasándole el JSON y el color del usuario
+          // 🚀 VIAJAMOS A LA ARENA PASÁNDOLE TODOS LOS DATOS PARA QUE GUARDE LA NOTA
           context.push('/quiz', extra: {
-            'quizData': quizData,
+            'quizId': newQuizId, // 👈 ¡FALTABA ESTO!
+            'quizData': generatedQuestions,
             'themeColor': widget.themeColor,
+            'user': widget.user, // 👈 ¡FALTABA ESTO TAMBIÉN PARA EL TOKEN!
           });
           
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('¡Cuestionario de $topic generado con éxito!', style: const TextStyle(color: Colors.white)),
-              backgroundColor: widget.themeColor,
-            )
+          // Opcional: Usando tu nueva función bonita de SnackBar
+          AppTheme.showSnackBar(
+            context, 
+            '¡Cuestionario de $topic generado y guardado!', 
+            themeColor: widget.themeColor
           );
         }
-      } else {
-        throw Exception(response.data['error'] ?? 'Error al generar');
       }
-
     } catch (e) {
+      print("Error generando/guardando: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Error al conectar con la IA. Intenta de nuevo.'), backgroundColor: Colors.redAccent)
+        AppTheme.showSnackBar(
+          context, 
+          'Error: No se pudo guardar el cuestionario.', 
+          type: SnackBarType.error
         );
       }
     } finally {
-      // 4. Apagamos el modo "Cargando"
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
@@ -146,9 +169,15 @@ class _AiQuizModalContentState extends State<_AiQuizModalContent> {
             controller: _topicController,
             style: const TextStyle(color: Colors.white),
             enabled: !_isLoading, // 👈 Desactivamos el input si está cargando
+            onChanged: (value) {
+              if (_topicError != null) {
+                setState(() => _topicError = null);
+              }
+            },
             decoration: InputDecoration(
               hintText: 'Ej. La Revolución Francesa, Álgebra lineal...',
               hintStyle: const TextStyle(color: Colors.white24),
+              errorText: _topicError,
               filled: true,
               fillColor: darkBackground,
               prefixIcon: Icon(Icons.search, color: widget.themeColor),
@@ -159,6 +188,14 @@ class _AiQuizModalContentState extends State<_AiQuizModalContent> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(15),
                 borderSide: BorderSide(color: widget.themeColor, width: 2),
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+                borderSide: const BorderSide(color: Colors.redAccent, width: 2),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+                borderSide: const BorderSide(color: Colors.redAccent, width: 2),
               ),
             ),
           ),
@@ -198,10 +235,10 @@ class _AiQuizModalContentState extends State<_AiQuizModalContent> {
 
           // ==================================================================
           // BOTÓN DE ACCIÓN DINÁMICO (Muestra Spinner si está cargando)
-          // ==================================================================
+          // ====================================================================
           ElevatedButton(
             // Si está cargando, pasamos null para desactivar el botón
-            onPressed: _isLoading ? null : _generateQuiz,
+            onPressed: _isLoading ? null : _generateAndSaveQuiz,
             style: ElevatedButton.styleFrom(
               backgroundColor: widget.themeColor,
               disabledBackgroundColor: widget.themeColor.withValues(alpha: 0.3), // Color apagado
