@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:go_router/go_router.dart';
 import 'package:superteach_app/config/theme/app_theme.dart';
 import 'package:superteach_app/domain/entities/user.dart';
 import 'package:superteach_app/config/api_client.dart';
+import 'package:flutter/foundation.dart'; // Para kIsWeb
 
 // ============================================================================
 // PANTALLA: CUESTIONARIO GAMIFICADO (AVANCE POR TOQUE EN PANTALLA)
@@ -116,9 +116,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     }
   }
 
-  /// Reinicia el quiz volviendo al inicio.
+ /// Reinicia el quiz volviendo al inicio.
   void _restartQuiz() {
-    Navigator.pop(context);
+    // Usamos el rootNavigator para asegurar que cerramos el modal flotante
+    Navigator.of(context, rootNavigator: true).pop();
     setState(() {
       _currentIndex = 0;
       _score = 0;
@@ -131,9 +132,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     _submitScore(_score, widget.quizData.length);
   }
 
-  /// Muestra un diálogo con el resultado y un mensaje opcional.
-  void _showResultsDialog(int displayScore, int displayMax, int correctAnswers, int totalQuestions,
-      {String? message, bool isError = false}) {
+  // ========================================================================
+  // FUNCIÓN: MOSTRAR EL DIÁLOGO FINAL (CON TU DISEÑO CLÁSICO)
+  // ========================================================================
+  void _showResultsDialog(int displayScore, int displayMax, int correctAnswers, int totalQuestions, {String? message, bool isError = false}) {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -147,11 +149,15 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
             backgroundColor: const Color(0xFF121826),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: widget.themeColor, width: 2),
+              side: BorderSide(color: isError ? Colors.redAccent : widget.themeColor, width: 2),
             ),
             title: Column(
               children: [
-                Icon(Icons.emoji_events, color: widget.themeColor, size: 60),
+                Icon(
+                  isError ? Icons.error_outline : Icons.emoji_events, 
+                  color: isError ? Colors.redAccent : widget.themeColor, 
+                  size: 60
+                ),
                 const SizedBox(height: 10),
                 Text(
                   '¡Cuestionario Terminado!',
@@ -167,34 +173,21 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: isError ? Colors.redAccent : Colors.greenAccent,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ],
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Tu puntuación:\n$displayScore / $displayMax',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Correctas: $correctAnswers / $totalQuestions',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
-                ),
-              ],
+            content: Text(
+              'Tu puntuación:\n$displayScore / $displayMax',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             actionsAlignment: MainAxisAlignment.center,
             actions: [
@@ -203,11 +196,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                 children: [
                   ElevatedButton.icon(
                     onPressed: _restartQuiz,
-                    icon: const Icon(Icons.refresh, color: darkBackground),
+                    icon: const Icon(Icons.refresh, color: Color(0xFF0A0E17)),
                     label: const Text(
                       'VOLVER A INTENTAR',
                       style: TextStyle(
-                        color: darkBackground,
+                        color: Color(0xFF0A0E17),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -222,8 +215,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed: () {
-                      context.pop(); // Cierra el modal de resultados
-                      context.pop(); // Vuelve a la pantalla anterior
+                      // Primero cerramos el modal
+                      Navigator.of(context, rootNavigator: true).pop();
+                      // Luego volvemos a la pantalla anterior
+                      context.pop(); 
                     },
                     icon: Icon(Icons.home, color: widget.themeColor),
                     label: Text(
@@ -261,13 +256,11 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     final int displayScore = backendScore;
     const int displayMax = 100;
 
-    // 1. Si no hay ID de cuestionario, es una práctica suelta. No guardamos.
     if (widget.quizId == null || widget.user == null) {
       _showResultsDialog(displayScore, displayMax, correctAnswers, totalQuestions);
       return;
     }
 
-    // 2. Mostramos el modal de carga
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -285,26 +278,17 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     );
 
     try {
-      print("📤 Obteniendo cliente HTTP seguro...");
-      
-      // 🚀 ¡AQUÍ ESTÁ LA MAGIA! Usamos tu ApiClient blindado
       final dio = await ApiClient.authenticatedClient();
 
-      print("📤 Disparando la petición a Node.js...");
-      
-      // 3. Enviamos la nota
       final response = await dio.post('/quizzes/${widget.quizId}/attempt', data: {
         "score": backendScore,
         "correctAnswers": correctAnswers,
         "totalQuestions": totalQuestions
       });
 
-      print("✅ Respuesta del servidor: ${response.statusCode}");
-
-      // 4. Cerramos el diálogo de carga
       if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
 
-      // 5. Validamos si fue exitoso (201 Created o 200 OK)
+      // Éxito
       if (response.statusCode == 201 || response.statusCode == 200) {
         _showResultsDialog(
           displayScore,
@@ -314,8 +298,14 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
           message: "¡Calificación guardada en la nube!",
         );
       } else {
-        // Si el servidor responde con 400 (ej: Límite de intentos)
-        final errorMsg = response.data['error'] ?? 'No se pudo guardar la nota.';
+        // Manejo seguro del error (sin romper la app por tipos de datos)
+        String errorMsg = 'Error devuelto por el servidor';
+        if (response.data is Map && response.data['error'] != null) {
+          errorMsg = response.data['error'].toString();
+        } else if (response.data is String) {
+          errorMsg = response.data;
+        }
+
         _showResultsDialog(
           displayScore,
           displayMax,
@@ -327,22 +317,28 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
       }
 
     } on DioException catch (e) {
-      // 🚨 Si hay error de red o de timeout (pasaron los 10 segundos)
-      print("❌ Error de DioException: ${e.message}");
       if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
       
+      // Manejo seguro del mensaje de error del servidor
+      String errorMsg = 'Error al procesar la solicitud.';
+      if (e.response != null && e.response!.data != null) {
+        if (e.response!.data is Map && e.response!.data['error'] != null) {
+          errorMsg = e.response!.data['error'].toString();
+        } else if (e.response!.data is String) {
+          errorMsg = e.response!.data;
+        }
+      }
+
       _showResultsDialog(
         displayScore,
         displayMax,
         correctAnswers,
         totalQuestions,
-        message: "Error de conexión o tiempo de espera agotado.",
+        message: "⚠️ $errorMsg (Código: ${e.response?.statusCode})",
         isError: true,
       );
       
     } catch (e) {
-      // 🚨 Error inesperado en el código
-      print("❌ Error inesperado: $e");
       if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
       
       _showResultsDialog(
@@ -354,7 +350,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
         isError: true,
       );
     }
-  }
+  }       
 
   /// Construye la interfaz de usuario de la pantalla del quiz.
   @override

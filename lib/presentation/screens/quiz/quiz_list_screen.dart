@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart'; // Para kIsWeb
 import 'package:go_router/go_router.dart';
 import 'package:superteach_app/config/theme/app_theme.dart';
 import 'package:superteach_app/domain/entities/user.dart';
+import 'package:superteach_app/config/api_client.dart'; // 👈 Asegúrate de que esta ruta sea correcta
 
 class QuizListScreen extends StatefulWidget {
   final User user;
@@ -26,17 +25,12 @@ class _QuizListScreenState extends State<QuizListScreen> {
     _fetchQuizzes();
   }
 
+  // ========================================================================
+  // OBTENER CUESTIONARIOS Y MEJOR NOTA (USANDO APICLIENT)
+  // ========================================================================
   Future<void> _fetchQuizzes() async {
     try {
-      final baseUrl = kIsWeb ? 'http://127.0.0.1:3000/api/v1' : 'http://10.0.2.2:3000/api/v1';
-      final dio = Dio(BaseOptions(
-        baseUrl: baseUrl,
-        headers: {
-          'Authorization': 'Bearer ${widget.user.token}',
-          'Content-Type': 'application/json'
-        },
-      ));
-
+      final dio = await ApiClient.authenticatedClient();
       final response = await dio.get('/quizzes');
 
       if (response.statusCode == 200) {
@@ -44,10 +38,13 @@ class _QuizListScreenState extends State<QuizListScreen> {
 
         for (var quiz in quizzes) {
           try {
+            // Buscamos los intentos de este cuestionario específicos para este usuario
             final attemptsResponse = await dio.get('/quizzes/${quiz['_id']}/attempts');
+            
             if (attemptsResponse.statusCode == 200) {
               final attempts = attemptsResponse.data['data'];
-              if (attempts.isNotEmpty) {
+              if (attempts != null && attempts.isNotEmpty) {
+                // Sacamos la mejor nota
                 final bestAttempt = attempts.reduce((a, b) => a['score'] > b['score'] ? a : b);
                 quiz['bestScore'] = bestAttempt['score'];
               } else {
@@ -72,7 +69,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
     }
   }
 
-  // 👇 FUNCIÓN AUXILIAR PARA ALERTAS FLOTANTES SEGURAS
+  // 👇 FUNCIÓN AUXILIAR PARA ALERTAS FLOTANTES
   void _showFloatingAlert(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -84,20 +81,23 @@ class _QuizListScreenState extends State<QuizListScreen> {
           ],
         ),
         backgroundColor: isError ? Colors.redAccent : widget.themeColor,
-        behavior: SnackBarBehavior.floating, // Flotante
+        behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       ),
     );
   }
 
+  // ========================================================================
+  // ELIMINAR CUESTIONARIO (PARA TODOS LOS USUARIOS)
+  // ========================================================================
   Future<void> _deleteQuiz(String quizId, String topic) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF121826),
         title: Text('Eliminar Cuestionario', style: TextStyle(color: widget.themeColor)),
-        content: Text('¿Estás seguro de que quieres eliminar el cuestionario "$topic"?', style: const TextStyle(color: Colors.white)),
+        content: Text('¿Estás seguro de que quieres eliminar "$topic"?', style: const TextStyle(color: Colors.white)),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancelar', style: TextStyle(color: Colors.white54))),
           TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent))),
@@ -108,9 +108,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
     if (confirmed != true) return;
 
     try {
-      final baseUrl = kIsWeb ? 'http://127.0.0.1:3000/api/v1' : 'http://10.0.2.2:3000/api/v1';
-      final dio = Dio(BaseOptions(baseUrl: baseUrl, headers: {'Authorization': 'Bearer ${widget.user.token}'}));
-
+      final dio = await ApiClient.authenticatedClient();
       final response = await dio.delete('/quizzes/$quizId');
 
       if (response.statusCode == 200) {
@@ -118,10 +116,13 @@ class _QuizListScreenState extends State<QuizListScreen> {
         _showFloatingAlert('Cuestionario eliminado correctamente');
       }
     } catch (e) {
-      _showFloatingAlert('Error al eliminar el cuestionario', isError: true);
+      _showFloatingAlert('Error al eliminar el cuestionario (Puede que no seas el creador)', isError: true);
     }
   }
 
+  // ========================================================================
+  // PUBLICAR CUESTIONARIO (SOLO PARA PROFESORES)
+  // ========================================================================
   Future<void> _publishQuiz(String quizId, String topic, bool publish) async {
     int? maxAttempts;
     if (publish) {
@@ -133,9 +134,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
     }
 
     try {
-      final baseUrl = kIsWeb ? 'http://127.0.0.1:3000/api/v1' : 'http://10.0.2.2:3000/api/v1';
-      final dio = Dio(BaseOptions(baseUrl: baseUrl, headers: {'Authorization': 'Bearer ${widget.user.token}'}));
-
+      final dio = await ApiClient.authenticatedClient();
       final response = await dio.put('/quizzes/$quizId/publish', data: {
         'isPublished': publish,
         if (publish) 'maxAttempts': maxAttempts,
@@ -164,7 +163,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: widget.themeColor),
-        title: Text('Cuestionarios Disponibles', style: TextStyle(color: widget.themeColor, fontWeight: FontWeight.bold)),
+        title: Text('Mis Cuestionarios', style: TextStyle(color: widget.themeColor, fontWeight: FontWeight.bold)),
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: widget.themeColor))
@@ -182,15 +181,14 @@ class _QuizListScreenState extends State<QuizListScreen> {
                       itemCount: _quizzes.length,
                       itemBuilder: (context, index) {
                         final quiz = _quizzes[index];
-                        final questionCount = quiz['questions'].length;
-                        final maxAttempts = quiz['maxAttempts'] ?? 0;
+                        final questionCount = quiz['questions']?.length ?? 0;
                         final bestScore = quiz['bestScore'];
 
                         return Card(
                           color: const Color(0xFF121826),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
-                            side: BorderSide(color: widget.themeColor.withValues(alpha: 0.3), width: 1),
+                            side: BorderSide(color: widget.themeColor.withOpacity(0.3), width: 1),
                           ),
                           margin: const EdgeInsets.only(bottom: 15),
                           child: Padding(
@@ -201,7 +199,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
                                 Row(
                                   children: [
                                     CircleAvatar(
-                                      backgroundColor: widget.themeColor.withValues(alpha: 0.2),
+                                      backgroundColor: widget.themeColor.withOpacity(0.2),
                                       child: Icon(Icons.quiz, color: widget.themeColor),
                                     ),
                                     const SizedBox(width: 15),
@@ -209,54 +207,84 @@ class _QuizListScreenState extends State<QuizListScreen> {
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text(quiz['topic'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                          Text(quiz['topic'] ?? 'Sin tema', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
                                           const SizedBox(height: 4),
-                                          Text('$questionCount preguntas • ${maxAttempts == 0 ? "Intentos Ilimitados" : "Max. $maxAttempts intentos"}', style: const TextStyle(color: Colors.white54)),
+                                          
+                                          // 🧹 LIMPIEZA: Solo mostramos la cantidad de preguntas en la lista
+                                          Text('$questionCount preguntas', style: const TextStyle(color: Colors.white54)),
+                                          
+                                          // 🏆 MEJOR PUNTUACIÓN (DORADO PARA TODOS)
                                           if (bestScore != null) ...[
                                             const SizedBox(height: 4),
-                                            Text('Mejor puntuación: $bestScore/100', style: TextStyle(color: widget.themeColor, fontWeight: FontWeight.w500)),
+                                            Text(
+                                              'Mejor puntuación: $bestScore/100', 
+                                              style: const TextStyle(
+                                                color: Colors.amberAccent, 
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 15,
+                                                letterSpacing: 1.1,
+                                              ),
+                                            ),
                                           ],
                                         ],
                                       ),
                                     ),
-                                    if (widget.user.isTeacher) ...[
-                                      PopupMenuButton<String>(
-                                        onSelected: (value) {
-                                          switch (value) {
-                                            case 'publish':
-                                              _publishQuiz(quiz['_id'], quiz['topic'], !(quiz['isPublished'] ?? false));
-                                              break;
-                                            case 'grades': // 🚀 NUEVA OPCIÓN
-                                              context.push('/grades', extra: {'quiz': quiz, 'user': widget.user, 'themeColor': widget.themeColor});
-                                              break;
-                                            case 'delete':
-                                              _deleteQuiz(quiz['_id'], quiz['topic']);
-                                              break;
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
+                                    
+                                    // ⚙️ MENÚ DE OPCIONES (DINÁMICO SEGÚN ROL)
+                                    PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        switch (value) {
+                                          case 'publish':
+                                            _publishQuiz(quiz['_id'], quiz['topic'], !(quiz['isPublished'] ?? false));
+                                            break;
+                                          case 'grades': 
+                                            context.push('/grades', extra: {'quiz': quiz, 'user': widget.user, 'themeColor': widget.themeColor});
+                                            break;
+                                          case 'delete':
+                                            _deleteQuiz(quiz['_id'], quiz['topic']);
+                                            break;
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        // SOLO PARA PROFESORES: Subir a clase y Ver Calificaciones
+                                        if (widget.user.isTeacher) ...[
                                           if (!(quiz['isPublished'] ?? false))
                                             const PopupMenuItem(value: 'publish', child: Row(children: [Icon(Icons.publish, color: Colors.green), SizedBox(width: 8), Text('Subir a clase', style: TextStyle(color: Colors.green))]))
                                           else
                                             const PopupMenuItem(value: 'publish', child: Row(children: [Icon(Icons.unpublished, color: Colors.orange), SizedBox(width: 8), Text('Quitar de clase', style: TextStyle(color: Colors.orange))])),
-                                          
-                                          // 🚀 EL BOTÓN DE CALIFICACIONES
-                                          const PopupMenuItem(value: 'grades', child: Row(children: [Icon(Icons.bar_chart, color: Colors.blueAccent), SizedBox(width: 8), Text('Ver Calificaciones', style: TextStyle(color: Colors.blueAccent))])),
-                                          
-                                          const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, color: Colors.redAccent), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: Colors.redAccent))])),
                                         ],
-                                        icon: const Icon(Icons.more_vert, color: Colors.white54),
-                                      ),
-                                    ],
+                                        
+                                        // PARA TODOS: Eliminar
+                                        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, color: Colors.redAccent), SizedBox(width: 8), Text('Eliminar', style: TextStyle(color: Colors.redAccent))])),
+                                      ],
+                                      icon: const Icon(Icons.more_vert, color: Colors.white54),
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 15),
                                 Align(
                                   alignment: Alignment.centerRight,
                                   child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: widget.themeColor, foregroundColor: darkBackground, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-                                    onPressed: () {
-                                      context.push('/quiz', extra: {'quizId': quiz['_id'], 'quizData': quiz['questions'], 'themeColor': widget.themeColor, 'user': widget.user});
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: widget.themeColor, 
+                                      foregroundColor: darkBackground, 
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                                    ),
+                                    // 🚀 MAGIA EN TIEMPO REAL: Convertimos esto en async
+                                    onPressed: () async {
+                                      // 1. Esperamos a que el usuario termine de jugar y vuelva
+                                      await context.push('/quiz', extra: {
+                                        'quizId': quiz['_id'], 
+                                        'quizData': quiz['questions'], 
+                                        'themeColor': widget.themeColor, 
+                                        'user': widget.user
+                                      });
+                                      
+                                      // 2. Al regresar a esta pantalla, recargamos la lista silenciosamente 
+                                      // para que la nota dorada aparezca al instante.
+                                      if (mounted) {
+                                        _fetchQuizzes();
+                                      }
                                     },
                                     child: const Text('JUGAR', style: TextStyle(fontWeight: FontWeight.bold)),
                                   ),
@@ -271,6 +299,7 @@ class _QuizListScreenState extends State<QuizListScreen> {
   }
 }
 
+// DIÁLOGO PARA CONFIGURAR INTENTOS (SOLO LO VE EL PROFESOR)
 class _AttemptsDialog extends StatefulWidget {
   final Color themeColor;
   const _AttemptsDialog({required this.themeColor});
@@ -295,8 +324,8 @@ class _AttemptsDialogState extends State<_AttemptsDialog> {
             dropdownColor: const Color(0xFF121826),
             style: const TextStyle(color: Colors.white),
             decoration: InputDecoration(
-              border: OutlineInputBorder(borderSide: BorderSide(color: widget.themeColor.withValues(alpha: 0.3))),
-              enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: widget.themeColor.withValues(alpha: 0.3))),
+              border: OutlineInputBorder(borderSide: BorderSide(color: widget.themeColor.withOpacity(0.3))),
+              enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: widget.themeColor.withOpacity(0.3))),
               focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: widget.themeColor)),
             ),
             items: const [
