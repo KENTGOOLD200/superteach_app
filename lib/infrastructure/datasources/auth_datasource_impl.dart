@@ -8,20 +8,6 @@ import 'package:flutter/foundation.dart'; // Para usar kIsWeb
 // ============================================================================
 
 class MockAuthDataSource {
-  
-  // Base de datos persistente (Static)
-  static final List<Map<String, dynamic>> _mockDatabase = [
-    {
-      'email': 'profe@test.com',
-      'password': '123',
-      'name': 'Profesor Xavier',
-      'username': 'ProfeX', // ⚠️ Nuevo campo usuario
-      'role': 'teacher',
-      'phone': '0999999999',
-    },
-  ];
-
-  static final List<String> _activeClassCodes = ['MAT-101', 'HIST-202'];
 
   // --- LOGIN ---
   // --- LOGIN (CONEXIÓN REAL AL BACKEND) ---
@@ -78,21 +64,21 @@ class MockAuthDataSource {
 
   // --- VALIDACIONES ---
 
+  // --- VALIDACIONES ---
+  // 🚀 Ahora devolvemos "false" directamente porque Node.js (MongoDB) 
+  // se encargará de rechazar el registro si el correo o usuario ya existen,
+  // devolviendo un error 400 que tu App atrapará y mostrará en rojo.
+
   Future<bool> checkEmailExists(String email) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    return _mockDatabase.any((u) => u['email'] == email);
+    return false; // Dejamos que Node.js haga el trabajo duro
   }
 
-  // ⚠️ NUEVA VALIDACIÓN: USUARIO DUPLICADO
   Future<bool> checkUsernameExists(String username) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    // Compara ignorando mayúsculas/minúsculas
-    return _mockDatabase.any((u) => u['username'].toString().toLowerCase() == username.toLowerCase());
+    return false; // Dejamos que Node.js haga el trabajo duro
   }
 
   Future<bool> checkClassCodeExists(String code) async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    return _activeClassCodes.contains(code.toUpperCase()); 
+    return false; // Dejamos que Node.js haga el trabajo duro
   }
 
  // --- REGISTRO (CONEXIÓN REAL AL BACKEND) ---

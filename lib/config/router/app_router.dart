@@ -37,7 +37,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   });
 
   return GoRouter(
-    initialLocation: '/onboarding', 
+    initialLocation: '/login', // 👈 Se coloca AQUÍ ADENTRO, no arriba.
     refreshListenable: authNotifier, // 👈 El Router escucha a este notificador, no se destruye
 
     // 2. 🛡️ EL POLICÍA DE TRÁNSITO (REDIRECCIÓN)
@@ -60,7 +60,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // Si SÍ está logueado...
       if (authStatus == AuthStatus.authenticated) {
-        if (isGoingTo == '/login' || isGoingTo == '/register' || isGoingTo == '/onboarding') {
+        if (isGoingTo == '/login' || isGoingTo == '/register' || isGoingTo == '/onboarding' || isGoingTo == '/') {
           return '/home'; // Lo mandamos a su panel
         }
       }
@@ -69,7 +69,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     },
 
     routes: [
-      
+      // ========================================================================
+      // 🛡️ SOLUCIÓN PANTALLA NEGRA: Redirige la raíz '/' a '/login'
+      // ========================================================================
+      GoRoute(
+        path: '/',
+        redirect: (context, state) => '/login',
+      ),
+
       // 1. RUTA: ONBOARDING (Bienvenida)
       GoRoute(
         path: '/onboarding',
@@ -90,14 +97,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       // 4. RUTA: HOME (Panel Principal)
       GoRoute(
-      path: '/home',
-      builder: (context, state) => const HomeScreen(),
+        path: '/home',
+        builder: (context, state) => const HomeScreen(),
       ),
 
       // 5. RUTA: RECURSOS
       GoRoute(
-      path: '/resources',
-      builder: (context, state) => const ResourcesScreen(),
+        path: '/resources',
+        builder: (context, state) => const ResourcesScreen(),
       ),
 
       // 6. RUTA: CUESTIONARIO
@@ -108,7 +115,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           return QuizScreen(
             quizData: extraData['quizData'],
             themeColor: extraData['themeColor'],
-            // 👇 NUEVOS DATOS PARA GUARDAR LA NOTA 👇
             quizId: extraData['quizId'],
             user: extraData['user'],
           );
@@ -116,7 +122,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
 
       // 7. RUTA: PERFIL (Ajustes y Foto de Perfil)
-     GoRoute(
+      GoRoute(
         path: '/profile',
         builder: (context, state) {
           final extraData = state.extra as Map<String, dynamic>? ?? {};
@@ -132,7 +138,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // 8. 🚀 NUEVA RUTA: LISTA DE CUESTIONARIOS
+      // 8. RUTA: LISTA DE CUESTIONARIOS
       GoRoute(
         path: '/quiz-list',
         builder: (context, state) {
@@ -144,9 +150,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // 9. 🚀 NUEVA RUTA: CALIFICACIONES
+      // 9. 🚀 RUTA: CALIFICACIONES (Corregida con :quizId)
       GoRoute(
-        path: '/grades',
+        path: '/grades/:quizId',
         builder: (context, state) {
           final extraData = state.extra as Map<String, dynamic>;
           return GradesScreen(

@@ -132,10 +132,10 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
     _submitScore(_score, widget.quizData.length);
   }
 
+// ========================================================================
+  // FUNCIÓN: MOSTRAR EL DIÁLOGO FINAL (CON LÓGICA DE BOTONES)
   // ========================================================================
-  // FUNCIÓN: MOSTRAR EL DIÁLOGO FINAL (CON TU DISEÑO CLÁSICO)
-  // ========================================================================
-  void _showResultsDialog(int displayScore, int displayMax, int correctAnswers, int totalQuestions, {String? message, bool isError = false}) {
+  void _showResultsDialog(int displayScore, int displayMax, int correctAnswers, int totalQuestions, {String? message, bool isError = false, bool showRetryButton = true}) {
     showGeneralDialog(
       context: context,
       barrierDismissible: false,
@@ -166,13 +166,15 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                // 💬 MENSAJE DINÁMICO (Límites, errores o éxito)
                 if (message != null) ...[
                   const SizedBox(height: 10),
                   Text(
                     message,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isError ? Colors.redAccent : Colors.greenAccent,
+                      // Si no hay botón de reintentar, lo pintamos rojo de advertencia
+                      color: (!showRetryButton || isError) ? Colors.redAccent : Colors.greenAccent,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -194,30 +196,32 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: _restartQuiz,
-                    icon: const Icon(Icons.refresh, color: Color(0xFF0A0E17)),
-                    label: const Text(
-                      'VOLVER A INTENTAR',
-                      style: TextStyle(
-                        color: Color(0xFF0A0E17),
-                        fontWeight: FontWeight.bold,
+                  // 🚫 MAGIA: Ocultamos el botón si showRetryButton es falso
+                  if (showRetryButton) ...[
+                    ElevatedButton.icon(
+                      onPressed: _restartQuiz,
+                      icon: const Icon(Icons.refresh, color: Color(0xFF0A0E17)),
+                      label: const Text(
+                        'VOLVER A INTENTAR',
+                        style: TextStyle(
+                          color: Color(0xFF0A0E17),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: widget.themeColor,
+                        padding: const EdgeInsets.symmetric(vertical: 15),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: widget.themeColor,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 10),
+                  ],
+                  // El botón de Volver al Inicio SIEMPRE se muestra
                   OutlinedButton.icon(
                     onPressed: () {
-                      // Primero cerramos el modal
                       Navigator.of(context, rootNavigator: true).pop();
-                      // Luego volvemos a la pantalla anterior
                       context.pop(); 
                     },
                     icon: Icon(Icons.home, color: widget.themeColor),
@@ -249,7 +253,7 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
   }
 
   // ========================================================================
-  // FUNCIÓN: ENVIAR NOTA AL BACKEND AL TERMINAR
+  // FUNCIÓN: ENVIAR NOTA Y PROCESAR LÍMITES
   // ========================================================================
   Future<void> _submitScore(int correctAnswers, int totalQuestions) async {
     final int backendScore = ((correctAnswers / totalQuestions) * 100).round();
@@ -288,22 +292,28 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
 
       if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
 
-      // Éxito
+      // ✅ ÉXITO AL GUARDAR
       if (response.statusCode == 201 || response.statusCode == 200) {
-        _showResultsDialog(
-          displayScore,
-          displayMax,
-          correctAnswers,
-          totalQuestions,
-          message: "¡Calificación guardada en la nube!",
-        );
-      } else {
-        // Manejo seguro del error (sin romper la app por tipos de datos)
-        String errorMsg = 'Error devuelto por el servidor';
-        if (response.data is Map && response.data['error'] != null) {
-          errorMsg = response.data['error'].toString();
-        } else if (response.data is String) {
-          errorMsg = response.data;
+        final responseData = response.data;
+        final attemptData = responseData['data'];
+        
+        final bool isCreator = responseData['isCreator'] ?? true;
+        final int maxAttempts = responseData['maxAttempts'] ?? 0;
+        final int attemptNumber = attemptData['attemptNumber'] ?? 1;
+
+        bool showRetry = true;
+        String finalMessage = "¡Calificación guardada en la nube!";
+
+        // 🛡️ LÓGICA DE RESTRICCIÓN PARA ESTUDIANTES
+        if (maxAttempts > 0 && !isCreator) {
+          int remaining = maxAttempts - attemptNumber;
+          
+          if (remaining <= 0) {
+            finalMessage = "Límite de intentos alcanzado.";
+            showRetry = false; // 🚫 Desaparecemos el botón
+          } else {
+            finalMessage = "Te queda(n) $remaining intento(s).";
+          }
         }
 
         _showResultsDialog(
@@ -311,46 +321,47 @@ class _QuizScreenState extends State<QuizScreen> with SingleTickerProviderStateM
           displayMax,
           correctAnswers,
           totalQuestions,
+          message: finalMessage,
+          showRetryButton: showRetry, // 👈 Le pasamos la instrucción al diálogo
+        );
+      } else {
+        String errorMsg = response.data['error']?.toString() ?? 'Error devuelto por el servidor';
+        _showResultsDialog(
+          displayScore, displayMax, correctAnswers, totalQuestions,
           message: "⚠️ $errorMsg",
           isError: true,
+          showRetryButton: false, // Si es un error lógico, bloqueamos reintento
         );
       }
 
     } on DioException catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
       
-      // Manejo seguro del mensaje de error del servidor
       String errorMsg = 'Error al procesar la solicitud.';
+      bool isLimitReached = false;
+
       if (e.response != null && e.response!.data != null) {
-        if (e.response!.data is Map && e.response!.data['error'] != null) {
-          errorMsg = e.response!.data['error'].toString();
-        } else if (e.response!.data is String) {
-          errorMsg = e.response!.data;
-        }
+        errorMsg = e.response!.data['error']?.toString() ?? errorMsg;
+        // Si el backend arrojó 400, significa que quiso burlar el sistema
+        if (e.response!.statusCode == 400) isLimitReached = true;
       }
 
       _showResultsDialog(
-        displayScore,
-        displayMax,
-        correctAnswers,
-        totalQuestions,
-        message: "⚠️ $errorMsg (Código: ${e.response?.statusCode})",
+        displayScore, displayMax, correctAnswers, totalQuestions,
+        message: "⚠️ $errorMsg",
         isError: true,
+        showRetryButton: !isLimitReached, // 🚫 Si hizo trampa, no hay botón
       );
       
     } catch (e) {
       if (mounted) Navigator.of(context, rootNavigator: true).pop(); 
-      
       _showResultsDialog(
-        displayScore,
-        displayMax,
-        correctAnswers,
-        totalQuestions,
+        displayScore, displayMax, correctAnswers, totalQuestions,
         message: "Error interno inesperado.",
         isError: true,
       );
     }
-  }       
+  }
 
   /// Construye la interfaz de usuario de la pantalla del quiz.
   @override
